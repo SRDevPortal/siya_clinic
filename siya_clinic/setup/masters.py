@@ -112,40 +112,54 @@ def create_item_group_template_doctype():
         "name": doctype,
         "module": MODULE_DEF_NAME,
         "custom": 1,
-        "autoname": "field:template_name",
+        "autoname": "naming_series:",
         "title_field": "template_name",
+        "search_fields": "template_name",
+        "show_title_field_in_link": 1,
         "track_changes": 1,
         "fields": [
+
+            # 🔥 Naming Series
+            {
+                "fieldname": "naming_series",
+                "label": "Series",
+                "fieldtype": "Select",
+                "options": "IGT-.YY.-.#####",
+                "default": "IGT-.YY.-.#####",
+                "reqd": 1,
+                "hidden": 1
+            },
+
             {
                 "fieldname": "template_name",
                 "label": "Template Name",
                 "fieldtype": "Data",
-                "reqd": 1,
-                "unique": 1,
+                "reqd": 1
             },
             {
                 "fieldname": "description",
                 "label": "Description",
-                "fieldtype": "Small Text",
+                "fieldtype": "Small Text"
             },
             {
                 "fieldname": "is_active",
                 "label": "Is Active",
                 "fieldtype": "Check",
                 "default": 1,
+                "in_list_view": 1
             },
             {
                 "fieldname": "section_items",
                 "label": "Items",
-                "fieldtype": "Section Break",
+                "fieldtype": "Section Break"
             },
             {
                 "fieldname": "items",
                 "label": "Items",
                 "fieldtype": "Table",
                 "options": "Item Group Template Item",
-                "reqd": 1,
-            },
+                "reqd": 1
+            }
         ],
         "permissions": [
             {
@@ -154,9 +168,9 @@ def create_item_group_template_doctype():
                 "write": 1,
                 "create": 1,
                 "delete": 1,
-                "report": 1,
+                "report": 1
             }
-        ],
+        ]
     })
 
     doc.insert(ignore_permissions=True)

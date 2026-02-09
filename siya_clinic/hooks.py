@@ -14,17 +14,26 @@ after_migrate = "siya_clinic.install.after_migrate"
 # before_uninstall = "siya_clinic.uninstall.before_uninstall"
 # after_uninstall = "siya_clinic.uninstall.after_uninstall"
 
+doc_events = {}
+
+doctype_js = {
+    "Sales Invoice": "public/js/sales_invoice.js",
+}
+
+app_include_js = [
+    "/assets/siya_clinic/js/item_group_template.js"
+]
+
 app_include_css = [
     "/assets/siya_clinic/css/theme_overrides.css",
 ]
 
 web_include_css = "/assets/siya_clinic/css/theme_overrides.css"
 
-doc_events = {}
-
-doctype_js = {
-    "Item Group Template": "public/js/item_group_template.js",
-    "Sales Invoice": "public/js/sales_invoice.js",
+# Allow Shopify Full Invoice API
+override_whitelisted_methods = {
+    "siya_clinic.api.shopify.create_full_invoice":
+        "siya_clinic.api.shopify.create_full_invoice"
 }
 
 
