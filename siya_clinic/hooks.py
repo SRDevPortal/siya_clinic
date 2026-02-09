@@ -32,8 +32,8 @@ web_include_css = "/assets/siya_clinic/css/theme_overrides.css"
 
 # Allow Shopify Full Invoice API
 override_whitelisted_methods = {
-    "siya_clinic.api.shopify.create_full_invoice":
-        "siya_clinic.api.shopify.create_full_invoice"
+    "siya_clinic.api.shopify.create_shopify_order":
+        "siya_clinic.api.shopify.create_shopify_order"
 }
 
 
