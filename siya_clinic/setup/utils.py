@@ -1,47 +1,66 @@
-# apps/siya_clinic/siya_clinic/setup/utils.py
+# siya_clinic/setup/utils.py
 import frappe
 import json
+import logging
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields as _ccf
 
-MODULE_DEF_NAME = "Siya Clinic"   # Desk Module Def label
-APP_PY_MODULE   = "siya_clinic"   # Python package
+logger = logging.getLogger(__name__)
 
-# def ensure_module_def():
-#     """Make sure the Module Def row exists."""
-#     if not frappe.db.exists("Module Def", MODULE_DEF_NAME):
-#         frappe.get_doc({
-#             "doctype": "Module Def",
-#             "module_name": MODULE_DEF_NAME,
-#             "app_name": APP_PY_MODULE
-#         }).insert(ignore_permissions=True)
+MODULE_DEF_NAME = "Siya Clinic"   # Desk Module Def label
+APP_PY_MODULE   = "siya_clinic"   # Python package name (matches app folder)
+
+
+# ---------------------------------------------------------
+# Module Utilities
+# ---------------------------------------------------------
 
 def ensure_module_def(module_name: str, app_name: str):
-    """Make sure the Module Def row exists."""
+    """Ensure Module Def exists."""
     if not frappe.db.exists("Module Def", module_name):
+        logger.info(f"Creating Module Def: {module_name}")
         frappe.get_doc({
             "doctype": "Module Def",
             "module_name": module_name,
             "app_name": app_name
         }).insert(ignore_permissions=True)
+        frappe.db.commit()
+
 
 def reload_local_json_doctypes(names: list[str]):
     """Reload DocTypes shipped as JSON under doctype/"""
     for dn in names or []:
         try:
+            logger.info(f"Reloading JSON DocType: {dn}")
             frappe.reload_doc(APP_PY_MODULE, "doctype", dn)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to reload DocType {dn}: {e}")
+
+
+# ---------------------------------------------------------
+# Custom Field Utilities
+# ---------------------------------------------------------
 
 def create_cf_with_module(mapping: dict, module: str = MODULE_DEF_NAME):
-    """create_custom_fields but auto-injects `module` so fixtures & uninstall are clean."""
+    """
+    create_custom_fields but auto-injects `module`
+    so fixtures & uninstall remain clean.
+    """
     for dt, fields in mapping.items():
         for f in fields:
             f.setdefault("module", module)
+
+    logger.info("Creating custom fields")
     _ccf(mapping, ignore_validate=True)
+    frappe.clear_cache()
+
+
+# ---------------------------------------------------------
+# Property Setter Utilities
+# ---------------------------------------------------------
 
 def upsert_property_setter(doctype, fieldname, prop, value, property_type, module: str = MODULE_DEF_NAME):
-    """Idempotent Property Setter with module tagging.
-       If fieldname is falsy (None/""), create a DocType-level PS; else DocField-level.
+    """
+    Idempotent Property Setter with module tagging.
     """
     is_dt_level = not fieldname
     ps_name = f"{doctype}-{prop}" if is_dt_level else f"{doctype}-{fieldname}-{prop}"
@@ -62,6 +81,14 @@ def upsert_property_setter(doctype, fieldname, prop, value, property_type, modul
     ps.module = module
     ps.save(ignore_permissions=True)
 
+    frappe.db.commit()
+    logger.info(f"Property Setter updated: {ps_name}")
+
+
+# ---------------------------------------------------------
+# Field Utilities
+# ---------------------------------------------------------
+
 def collapse_section(dt: str, fieldname: str, collapse: bool = True):
     if not frappe.get_meta(dt).get_field(fieldname):
         return
@@ -77,10 +104,11 @@ def ensure_field_before(doctype: str, fieldname: str, before: str):
     fields = [df.fieldname for df in meta.fields]
     if fieldname not in fields or before not in fields:
         return
+
     fields.remove(fieldname)
     idx = fields.index(before)
     fields.insert(idx, fieldname)
-    # WRITE JSON, not comma-string
+
     upsert_property_setter(doctype, None, "field_order", json.dumps(fields), "Text")
     frappe.clear_cache(doctype=doctype)
 
@@ -89,9 +117,11 @@ def ensure_field_after(doctype: str, fieldname: str, after: str):
     fields = [df.fieldname for df in meta.fields]
     if fieldname not in fields or after not in fields:
         return
+
     fields.remove(fieldname)
     idx = fields.index(after)
     fields.insert(idx + 1, fieldname)
+
     upsert_property_setter(doctype, None, "field_order", json.dumps(fields), "Text")
     frappe.clear_cache(doctype=doctype)
 
@@ -107,9 +137,8 @@ def upsert_title_field(doctype: str, fieldname: str):
     if not doctype or not fieldname:
         return
 
-    # Fetch current value to avoid unnecessary writes
     current = frappe.db.get_value("DocType", doctype, "title_field")
     if current != fieldname:
         frappe.db.set_value("DocType", doctype, "title_field", fieldname)
         frappe.clear_cache(doctype=doctype)
-        frappe.logger().info(f"Updated title_field for {doctype} to {fieldname}")
+        logger.info(f"Updated title_field for {doctype} to {fieldname}")
