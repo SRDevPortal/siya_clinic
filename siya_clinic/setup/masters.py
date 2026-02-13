@@ -1,11 +1,14 @@
-# apps/siya_clinic/siya_clinic/setup/masters.py
-
+# siya_clinic/setup/masters.py
 import frappe
+import logging
+
 from .utils import (
     MODULE_DEF_NAME, APP_PY_MODULE,
     ensure_module_def,
     reload_local_json_doctypes,
 )
+
+logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------
 # List of DocTypes shipped as JSON (folder names under doctype/)
@@ -20,12 +23,10 @@ def apply():
     """
     Apply all master setup steps for Siya Clinic.
 
-    This function is idempotent and safe to run multiple times.
-    It ensures:
-    - Module Def exists
-    - JSON DocTypes are reloaded (if any)
-    - All required master DocTypes are created
+    Safe to run multiple times.
     """
+
+    logger.info("Applying masters setup")
 
     # --------------------------------------------------------
     # Ensure Module Definition exists
@@ -33,23 +34,34 @@ def apply():
     ensure_module_def(MODULE_DEF_NAME, APP_PY_MODULE)
 
     # --------------------------------------------------------
-    # Reload local JSON DocTypes (if any are shipped)
+    # Reload local JSON DocTypes
     # --------------------------------------------------------
     reload_local_json_doctypes(JSON_DOCTYPES)
 
     # --------------------------------------------------------
-    # Create any master DocTypes that are required but not shipped as JSON
+    # Create required master DocTypes
     # --------------------------------------------------------
     create_item_group_template_item_doctype()
     create_item_group_template_doctype()
 
+    frappe.clear_cache()
+    frappe.db.commit()
+
+    logger.info("Masters setup completed")
+
+
+# ------------------------------------------------------------
+# DocType Creators
+# ------------------------------------------------------------
 
 def create_item_group_template_item_doctype():
-    """Creates the 'Item Group Template Item' child table DocType if it doesn't exist."""
+    """Create child table DocType if missing."""
     doctype = "Item Group Template Item"
 
     if frappe.db.exists("DocType", doctype):
         return
+
+    logger.info(f"Creating DocType: {doctype}")
 
     doc = frappe.get_doc({
         "doctype": "DocType",
@@ -98,14 +110,17 @@ def create_item_group_template_item_doctype():
     })
 
     doc.insert(ignore_permissions=True)
+    frappe.db.commit()
 
 
 def create_item_group_template_doctype():
-    """Creates the 'Item Group Template' master DocType if it doesn't exist."""
+    """Create master DocType if missing."""
     doctype = "Item Group Template"
 
     if frappe.db.exists("DocType", doctype):
         return
+
+    logger.info(f"Creating DocType: {doctype}")
 
     doc = frappe.get_doc({
         "doctype": "DocType",
@@ -119,7 +134,7 @@ def create_item_group_template_doctype():
         "track_changes": 1,
         "fields": [
 
-            # 🔥 Naming Series
+            # Naming Series
             {
                 "fieldname": "naming_series",
                 "label": "Series",
@@ -174,3 +189,4 @@ def create_item_group_template_doctype():
     })
 
     doc.insert(ignore_permissions=True)
+    frappe.db.commit()
