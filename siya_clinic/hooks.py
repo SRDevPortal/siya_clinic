@@ -6,13 +6,39 @@ app_email = "webdevelopersriaas@gmail.com"
 app_license = "mit"
 
 # Installation
-# before_install = "siya_clinic.install.before_install"
+before_install = "siya_clinic.install.before_install"
 after_install = "siya_clinic.install.after_install"
 after_migrate = "siya_clinic.install.after_migrate"
 
 # Uninstallation
-# before_uninstall = "siya_clinic.uninstall.before_uninstall"
-# after_uninstall = "siya_clinic.uninstall.after_uninstall"
+before_uninstall = "siya_clinic.uninstall.before_uninstall"
+after_uninstall = "siya_clinic.uninstall.after_uninstall"
+
+app_include_css = [
+    "/assets/siya_clinic/css/theme_overrides.css",
+]
+
+app_include_js = [
+    "/assets/siya_clinic/js/item_group_template.js"
+]
+
+web_include_css = "/assets/siya_clinic/css/theme_overrides.css"
+
+# list_js = {
+#     "Sales Invoice": "public/js/sales_invoice_list.js",
+# }
+
+# doctype_list_js = {
+#     "CRM Lead": "public/js/crm_lead_list.js",
+# }
+
+# permission_query_conditions = {
+#     "CRM Lead": "sriaas_clinic.api.crm_lead.access.crm_lead_pqc",
+# }
+
+# has_permission = {
+#     "CRM Lead": "sriaas_clinic.api.crm_lead.access.crm_lead_has_permission",
+# }
 
 doc_events = {}
 
@@ -20,21 +46,30 @@ doctype_js = {
     "Sales Invoice": "public/js/sales_invoice.js",
 }
 
-app_include_js = [
-    "/assets/siya_clinic/js/item_group_template.js"
-]
-
-app_include_css = [
-    "/assets/siya_clinic/css/theme_overrides.css",
-]
-
-web_include_css = "/assets/siya_clinic/css/theme_overrides.css"
-
-# Allow Shopify Full Invoice API
 override_whitelisted_methods = {
-    "siya_clinic.api.shopify.create_shopify_order":
-        "siya_clinic.api.shopify.create_shopify_order"
+    # Allow Shopify Full Invoice API to create Sales Invoices in our system
+    "siya_clinic.api.shopify.create_shopify_order": "siya_clinic.api.shopify.create_shopify_order",
+    # Override default assign_to behavior to use our custom assignment logic
+    "frappe.desk.form.assign_to.add": "siya_clinic.api.assign_guard.add",
+    "frappe.desk.form.assign_to.remove": "siya_clinic.api.assign_guard.remove",
+    "frappe.desk.form.assign_to.clear": "siya_clinic.api.assign_guard.clear",
 }
+
+fixtures = [
+    {"dt": "Custom Field", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Property Setter", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Client Script", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Server Script", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Workspace", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Print Format", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Report", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Dashboard Chart", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Notification", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Web Template", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Form Tour", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Form Tour Step", "filters": [["module", "=", "Siya Clinic"]]},
+    {"dt": "Custom DocPerm", "filters": [["module", "=", "Siya Clinic"]]},
+]
 
 
 # Apps
