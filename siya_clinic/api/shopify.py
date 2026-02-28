@@ -3,7 +3,7 @@ from frappe.utils import nowdate
 from frappe.utils.data import flt
 
 """
-POST /api/method/siya_clinic.api.create_full_invoice
+POST /api/method/siya_clinic.api.shopify.create_shopify_order
 
 Creates/rehydrates:
 - Customer
@@ -23,12 +23,12 @@ Optional payload flags/fields:
 # ------------------------------
 # Helpers
 # ------------------------------
-
 def _get_json():
     data = frappe.request.get_json(silent=True) or {}
     if not data:
         data = frappe._dict(frappe.local.form_dict)
     return frappe._dict(data)
+
 
 def _name_parts(full):
     full = (full or "").strip()
@@ -39,94 +39,6 @@ def _name_parts(full):
     last = " ".join(parts[1:]) if len(parts) > 1 else None
     return first, last
 
-def _default_address_title(customer, patient):
-    """Pick a human title for Address without requiring it in payload."""
-    title = None
-    if customer and frappe.db.exists("Customer", customer):
-        title = frappe.db.get_value("Customer", customer, "customer_name") or customer
-    if not title and patient and frappe.db.exists("Patient", patient):
-        title = frappe.db.get_value("Patient", patient, "patient_name") or patient
-    return title or "Address"
-
-def _company_has_field(fieldname: str) -> bool:
-    return frappe.get_meta("Company").has_field(fieldname)
-
-def _get_company_value(company: str, fieldname: str):
-    if _company_has_field(fieldname):
-        return frappe.db.get_value("Company", company, fieldname)
-    return None
-
-def _resolve_cost_center(company, cc_from_payload=None):
-    # prefer payload if valid
-    if _valid_cost_center(cc_from_payload, company):
-        return cc_from_payload
-
-    # try company defaults (handle schema differences)
-    for fname in ("default_cost_center", "cost_center"):
-        cc = _get_company_value(company, fname)
-        if _valid_cost_center(cc, company):
-            return cc
-
-    # fallback: any leaf cost center for this company
-    cc = frappe.db.get_value("Cost Center", {"company": company, "is_group": 0}, "name")
-    if cc:
-        return cc
-
-    frappe.throw(
-        f"No leaf Cost Center found for company '{company}'. "
-        f"Create one (Accounting → Cost Center) or pass 'cost_center' in items."
-    )
-
-def _valid_cost_center(name, company):
-    if not name:
-        return False
-    return bool(frappe.db.exists("Cost Center", {"name": name, "company": company, "is_group": 0}))
-
-def _resolve_income_account(company, acc_from_payload=None):
-    # prefer payload if valid for the company
-    if _valid_income_account(acc_from_payload, company):
-        return acc_from_payload
-    # company default income account
-    acc = frappe.db.get_value("Company", company, "default_income_account")
-    if _valid_income_account(acc, company):
-        return acc
-    # first leaf income account
-    acc = frappe.db.get_value("Account", {"company": company, "root_type": "Income", "is_group": 0}, "name")
-    if acc:
-        return acc
-    frappe.throw(f"No Income account found for company '{company}'. Set a default or pass 'income_account'.")
-
-def _valid_income_account(name, company):
-    if not name:
-        return False
-    return bool(frappe.db.exists("Account", {"name": name, "company": company, "is_group": 0, "root_type": "Income"}))
-
-def _resolve_price_list(payload, currency):
-    """Return (selling_price_list, price_list_currency, plc_conversion_rate) with safe defaults."""
-    spl = payload.get("selling_price_list")
-    if spl and not frappe.db.exists("Price List", spl):
-        spl = None
-
-    if not spl:
-        default_pl = frappe.db.get_single_value("Selling Settings", "selling_price_list")
-        if default_pl and frappe.db.exists("Price List", default_pl):
-            spl = default_pl
-        elif frappe.db.exists("Price List", "Standard Selling"):
-            spl = "Standard Selling"
-        else:
-            # create a minimal selling price list in the company currency
-            pl = frappe.get_doc({
-                "doctype": "Price List",
-                "price_list_name": "API Selling (INR)" if currency == "INR" else f"API Selling ({currency})",
-                "enabled": 1,
-                "selling": 1,
-                "currency": currency
-            }).insert(ignore_permissions=True)
-            spl = pl.name
-
-    plc = payload.get("price_list_currency") or frappe.db.get_value("Price List", spl, "currency") or currency
-    rate = payload.get("plc_conversion_rate") or (1 if plc == currency else None)
-    return spl, plc, rate
 
 def _resolve_company(val):
     # 1) If nothing passed, use default or the only company
@@ -166,11 +78,203 @@ def _resolve_company(val):
 
     frappe.throw(f"Company '{val}' not found (neither as name nor abbreviation).")
 
+
+def _resolve_income_account(company, acc_from_payload=None):
+    # prefer payload if valid for the company
+    if _valid_income_account(acc_from_payload, company):
+        return acc_from_payload
+    # company default income account
+    acc = frappe.db.get_value("Company", company, "default_income_account")
+    if _valid_income_account(acc, company):
+        return acc
+    # first leaf income account
+    acc = frappe.db.get_value("Account", {"company": company, "root_type": "Income", "is_group": 0}, "name")
+    if acc:
+        return acc
+    frappe.throw(f"No Income account found for company '{company}'. Set a default or pass 'income_account'.")
+
+
+def _resolve_paid_to_account(company, mode_of_payment=None, paid_to=None):
+    # explicit account passed?
+    if paid_to and frappe.db.exists("Account", {"name": paid_to, "company": company, "is_group": 0}):
+        return paid_to
+
+    # try MoP mapping
+    if mode_of_payment:
+        acc = frappe.db.get_value("Mode of Payment Account",
+                                  {"parent": mode_of_payment, "company": company},
+                                  "default_account") \
+              or frappe.db.get_value("Mode of Payment Account",
+                                     {"parent": mode_of_payment, "company": company},
+                                     "account")
+        if acc and frappe.db.exists("Account", {"name": acc, "company": company, "is_group": 0}):
+            return acc
+
+    # fallback: Cash, then Bank
+    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0}, "name")
+    if acc: return acc
+    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
+    if acc: return acc
+
+    frappe.throw(f"No Cash/Bank account found for company '{company}'. Map a Mode of Payment account or pass 'paid_to'.")
+
+
+def _resolve_cost_center(company, cc_from_payload=None):
+    # prefer payload if valid
+    if _valid_cost_center(cc_from_payload, company):
+        return cc_from_payload
+
+    # try company defaults (handle schema differences)
+    for fname in ("default_cost_center", "cost_center"):
+        cc = _get_company_value(company, fname)
+        if _valid_cost_center(cc, company):
+            return cc
+
+    # fallback: any leaf cost center for this company
+    cc = frappe.db.get_value("Cost Center", {"company": company, "is_group": 0}, "name")
+    if cc:
+        return cc
+
+    frappe.throw(
+        f"No leaf Cost Center found for company '{company}'. "
+        f"Create one (Accounting → Cost Center) or pass 'cost_center' in items."
+    )
+
+
+def _get_receivable_account(company):
+    # 1️⃣ Company default
+    acc = frappe.get_value("Company", company, "default_receivable_account")
+    if acc:
+        return acc
+
+    # 2️⃣ Receivable account_type
+    acc = frappe.db.get_value(
+        "Account",
+        {"company": company, "account_type": "Receivable", "is_group": 0},
+        "name"
+    )
+    if acc:
+        return acc
+    
+    # 3️⃣ Fallback: Debtors account (ERPNext standard)
+    acc = frappe.db.get_value(
+        "Account",
+        {"company": company, "name": ["like", "%Debtors%"], "is_group": 0},
+        "name"
+    )
+    if acc:
+        return acc
+
+    frappe.throw(
+        f"No receivable account found for company '{company}'. "
+        "Set default_receivable_account in Company."
+    )
+
+
+# -------------------------------------------------
+# Item Group Template Helpers
+# -------------------------------------------------
+def _get_item_group_template_from_item(item_code):
+    """
+    Match Shopify item_code with Item Group Template.template_name
+    using slug/normalized comparison.
+    """
+    code_norm = item_code.replace("-", " ").lower().strip()
+
+    templates = frappe.get_all(
+        "Item Group Template",
+        filters={"is_active": 1},
+        fields=["name", "template_name"]
+    )
+
+    for tpl in templates:
+        if tpl.template_name and tpl.template_name.lower().strip() == code_norm:
+            return tpl.name
+
+    return None
+
+
+def _expand_item_group_template(template_name, parent_qty):
+    tpl = frappe.get_doc("Item Group Template", template_name)
+    rows = []
+
+    for r in tpl.items:
+        rows.append({
+            "item_code": r.item_code,
+            "qty": flt(r.qty) * parent_qty,
+            "rate": flt(r.rate),
+            "item_tax_template": r.item_tax_template
+        })
+
+    return rows
+
+
+def _default_address_title(customer, patient):
+    """Pick a human title for Address without requiring it in payload."""
+    title = None
+    if customer and frappe.db.exists("Customer", customer):
+        title = frappe.db.get_value("Customer", customer, "customer_name") or customer
+    if not title and patient and frappe.db.exists("Patient", patient):
+        title = frappe.db.get_value("Patient", patient, "patient_name") or patient
+    return title or "Address"
+
+
+def _company_has_field(fieldname: str) -> bool:
+    return frappe.get_meta("Company").has_field(fieldname)
+
+
+def _get_company_value(company: str, fieldname: str):
+    if _company_has_field(fieldname):
+        return frappe.db.get_value("Company", company, fieldname)
+    return None
+
+
+def _valid_cost_center(name, company):
+    if not name:
+        return False
+    return bool(frappe.db.exists("Cost Center", {"name": name, "company": company, "is_group": 0}))
+
+
+def _valid_income_account(name, company):
+    if not name:
+        return False
+    return bool(frappe.db.exists("Account", {"name": name, "company": company, "is_group": 0, "root_type": "Income"}))
+
+
+def _resolve_price_list(payload, currency):
+    """Return (selling_price_list, price_list_currency, plc_conversion_rate) with safe defaults."""
+    spl = payload.get("selling_price_list")
+    if spl and not frappe.db.exists("Price List", spl):
+        spl = None
+
+    if not spl:
+        default_pl = frappe.db.get_single_value("Selling Settings", "selling_price_list")
+        if default_pl and frappe.db.exists("Price List", default_pl):
+            spl = default_pl
+        elif frappe.db.exists("Price List", "Standard Selling"):
+            spl = "Standard Selling"
+        else:
+            # create a minimal selling price list in the company currency
+            pl = frappe.get_doc({
+                "doctype": "Price List",
+                "price_list_name": "API Selling (INR)" if currency == "INR" else f"API Selling ({currency})",
+                "enabled": 1,
+                "selling": 1,
+                "currency": currency
+            }).insert(ignore_permissions=True)
+            spl = pl.name
+
+    plc = payload.get("price_list_currency") or frappe.db.get_value("Price List", spl, "currency") or currency
+    rate = payload.get("plc_conversion_rate") or (1 if plc == currency else None)
+    return spl, plc, rate
+
+
 def _ic_enabled() -> bool:
     try:
         return "india_compliance" in set(frappe.get_installed_apps() or [])
     except Exception:
         return False
+
 
 def _resolve_hsn_code(it, payload):
     # priority: item -> payload default -> site_config
@@ -184,6 +288,7 @@ def _resolve_hsn_code(it, payload):
             "or set 'siya_default_hsn' in site_config.json."
         )
     return code
+
 
 def _ensure_item(it, company):
     """Return a valid item_code; create a simple Service Item if missing and autocreate_item=1."""
@@ -210,29 +315,6 @@ def _ensure_item(it, company):
     }).insert(ignore_permissions=True)
     return doc.name
 
-def _resolve_paid_to_account(company, mode_of_payment=None, paid_to=None):
-    # explicit account passed?
-    if paid_to and frappe.db.exists("Account", {"name": paid_to, "company": company, "is_group": 0}):
-        return paid_to
-
-    # try MoP mapping
-    if mode_of_payment:
-        acc = frappe.db.get_value("Mode of Payment Account",
-                                  {"parent": mode_of_payment, "company": company},
-                                  "default_account") \
-              or frappe.db.get_value("Mode of Payment Account",
-                                     {"parent": mode_of_payment, "company": company},
-                                     "account")
-        if acc and frappe.db.exists("Account", {"name": acc, "company": company, "is_group": 0}):
-            return acc
-
-    # fallback: Cash, then Bank
-    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0}, "name")
-    if acc: return acc
-    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
-    if acc: return acc
-
-    frappe.throw(f"No Cash/Bank account found for company '{company}'. Map a Mode of Payment account or pass 'paid_to'.")
 
 # ---------- Currency helpers ----------
 def _safe_rate(from_curr, to_curr, posting_date):
@@ -243,10 +325,10 @@ def _safe_rate(from_curr, to_curr, posting_date):
     except Exception:
         return 1
 
+
 # ------------------------------
 # Customer
 # ------------------------------
-
 def _get_or_create_customer(payload):
     name = None
     email = payload.get("customer_email")
@@ -273,10 +355,10 @@ def _get_or_create_customer(payload):
     }).insert(ignore_permissions=True)
     return doc.name
 
+
 # ------------------------------
 # Patient  (patient=customer fallback supported)
 # ------------------------------
-
 def _get_or_create_patient(payload, customer):
     """Create/reuse Patient. If patient_* not provided (or patient_same_as_customer=1),
     auto-fill from customer_* and populate first/last name when available."""
@@ -346,13 +428,14 @@ def _get_or_create_patient(payload, customer):
     pdoc = frappe.get_doc(data).insert(ignore_permissions=True)
     return pdoc.name
 
+
 # ------------------------------
 # Address & Contact (Dynamic Links to both)
 # ------------------------------
-
 def _make_dynamic_links(link_doctypes):
     return [{"link_doctype": d["link_doctype"], "link_name": d["link_name"]}
             for d in link_doctypes if d.get("link_name")]
+
 
 def _create_or_update_address(payload, customer, patient):
     # Always compute a title if not provided
@@ -400,6 +483,7 @@ def _create_or_update_address(payload, customer, patient):
     }).insert(ignore_permissions=True)
     return ad.name
 
+
 def _create_or_update_contact(payload, customer, patient):
     email = payload.get("contact_email") or payload.get("customer_email")
     phone = payload.get("contact_phone") or payload.get("customer_phone")
@@ -442,10 +526,10 @@ def _create_or_update_contact(payload, customer, patient):
     }).insert(ignore_permissions=True)
     return cd.name
 
-# ------------------------------
-# Sales Invoice (GST auto-pick + robust price list)
-# ------------------------------
 
+# ------------------------------
+# Core: Sales Invoice
+# ------------------------------
 def _create_sales_invoice(payload, customer, patient):
     company = _resolve_company(payload.get("company"))
     company_currency = frappe.db.get_value("Company", company, "default_currency") or "INR"
@@ -455,7 +539,7 @@ def _create_sales_invoice(payload, customer, patient):
 
     items = payload.get("items") or []
     if not items:
-        frappe.throw("At least one item is required")
+        frappe.throw("Items missing")
 
     # ---- Company/Customer state to decide GST template ----
     company_state = payload.get("company_state")
@@ -481,17 +565,23 @@ def _create_sales_invoice(payload, customer, patient):
     taxes = payload.get("taxes")
     if not taxes:
         if company_state and customer_state:
-            template_name = "Output GST In-state" if company_state.strip().lower() == customer_state.strip().lower() else "Output GST Out-state"
+            template_name = (
+                "Output GST In-state"
+                if company_state.strip().lower() == customer_state.strip().lower()
+                else "Output GST Out-state"
+            )
             taxes = frappe.get_all(
                 "Sales Taxes and Charges",
                 filters={"parent": template_name},
-                fields=["charge_type", "account_head", "rate", "description", "included_in_print_rate"],
+                fields=[
+                    "charge_type", "account_head", "rate",
+                    "description", "included_in_print_rate"
+                ],
                 order_by="idx asc",
             )
         else:
             taxes = []
 
-    # If Shopify said prices include tax, force inclusivity
     if payload.get("taxes_included") in (1, "1", True, "true", "True"):
         for t in taxes:
             t["included_in_print_rate"] = 1
@@ -504,7 +594,9 @@ def _create_sales_invoice(payload, customer, patient):
             plc_conversion_rate = 1
         else:
             try:
-                plc_conversion_rate = frappe.utils.get_exchange_rate(price_list_currency, currency, posting_date)
+                plc_conversion_rate = frappe.utils.get_exchange_rate(
+                    price_list_currency, currency, posting_date
+                )
             except Exception:
                 plc_conversion_rate = 1
 
@@ -514,53 +606,95 @@ def _create_sales_invoice(payload, customer, patient):
             conversion_rate = 1
         else:
             try:
-                conversion_rate = frappe.utils.get_exchange_rate(currency, company_currency, posting_date)
+                conversion_rate = frappe.utils.get_exchange_rate(
+                    currency, company_currency, posting_date
+                )
             except Exception:
                 conversion_rate = 1
 
-    # ---- Build Items (keep Rate = MRP; discount via percentage) ----
+    # ---- Build Items ----
     autocreate = payload.get("autocreate_item") in (1, "1", True, "true", "True")
     has_disc_amount_field = frappe.get_meta("Sales Invoice Item").has_field("discount_amount")
 
     si_items = []
+    applied_template = None
+    kit_discount_applied = False
+
     for it in items:
-        code = (it.get("item_code") or it.get("item_name"))
+        code = it.get("item_code") or it.get("item_name")
         if autocreate:
             code = _ensure_item(it, company)
         elif not code:
             frappe.throw("Each item needs item_code or item_name.")
 
-        qty  = flt(it.get("qty") or 1)
-        gross_rate = flt(it.get("rate") or 0)   # Shopify line price
+        qty = flt(it.get("qty") or 1)
+        gross_rate = flt(it.get("rate") or 0)
         disc_pct = it.get("discount_percentage")
         disc_amt = flt(it.get("discount_amount") or 0)
 
-        # If only fixed discount is given, convert to %
-        if disc_amt and not disc_pct:
-            per_unit_disc = disc_amt / qty
-            disc_pct = (per_unit_disc / gross_rate * 100) if gross_rate else 0
-        disc_pct = max(0, min(100, flt(disc_pct or 0)))
+        template = _get_item_group_template_from_item(code)
 
-        cc  = _resolve_cost_center(company, it.get("cost_center"))
-        inc = _resolve_income_account(company, it.get("income_account"))
+        # =============================
+        # CASE 1: KIT / TEMPLATE ITEM
+        # =============================
+        if template:
+            applied_template = template
+            kit_discount_applied = True
 
-        row = {
-            "item_code": code,
-            "item_name": it.get("item_name") or it.get("item_code"),
-            "qty": qty,
-            "uom": it.get("uom") or "Nos",
-            # IMPORTANT: give only list rate + discount; DO NOT set "rate"
-            "price_list_rate": gross_rate,
-            "discount_percentage": disc_pct,
-            "income_account": inc,
-            "cost_center": cc,
-            "gst_hsn_code": it.get("gst_hsn_code"),
-        }
-        if has_disc_amount_field:
-            row["discount_amount"] = disc_amt  # so you can show this column in print
-        si_items.append(row)
+            expanded_items = _expand_item_group_template(template, qty)
 
-    # ---- Sales Invoice doc ----
+            total_qty = sum(row["qty"] for row in expanded_items)
+            total_discount = flt(it.get("discount_amount") or 0)
+            per_unit_discount = (total_discount / total_qty) if total_qty else 0
+
+            for kit in expanded_items:
+                net_rate = flt(kit["rate"] - per_unit_discount)
+
+                si_items.append({
+                    "item_code": kit["item_code"],
+                    "item_name": frappe.db.get_value("Item", kit["item_code"], "item_name"),
+                    "qty": kit["qty"],
+                    "uom": "Nos",
+
+                    "price_list_rate": kit["rate"],
+                    "rate": net_rate,   # ← THIS IS THE KEY
+                    "discount_amount": flt(per_unit_discount * kit["qty"]),
+
+                    "allow_zero_valuation_rate": 1,
+                    "is_free_item": 0,
+
+                    "income_account": _resolve_income_account(company),
+                    "cost_center": _resolve_cost_center(company),
+                    "item_tax_template": kit["item_tax_template"],
+                })
+            continue
+        
+        # =============================
+        # CASE 2: NORMAL ITEM
+        # =============================
+        else:
+            if disc_amt and not disc_pct:
+                per_unit_disc = disc_amt / qty
+                disc_pct = (per_unit_disc / gross_rate * 100) if gross_rate else 0
+            disc_pct = max(0, min(100, flt(disc_pct or 0)))
+
+            row = {
+                "item_code": code,
+                "item_name": it.get("item_name") or code,
+                "qty": qty,
+                "uom": it.get("uom") or "Nos",
+                "price_list_rate": gross_rate,
+                "discount_percentage": disc_pct,
+                "income_account": _resolve_income_account(company),
+                "cost_center": _resolve_cost_center(company),
+                "gst_hsn_code": it.get("gst_hsn_code"),
+            }
+
+            if has_disc_amount_field:
+                row["discount_amount"] = disc_amt
+
+            si_items.append(row)
+
     si_data = {
         "doctype": "Sales Invoice",
         "company": company,
@@ -568,31 +702,33 @@ def _create_sales_invoice(payload, customer, patient):
         "posting_date": posting_date,
         "due_date": due_date,
         "customer": customer,
-        "debit_to": "Debtors - EEPL",
+        "debit_to": _get_receivable_account(company),
         "items": si_items,
         "taxes": taxes,
-        "ignore_pricing_rule": 1,   # avoid rules changing your MRP+discount rows
+        "ignore_pricing_rule": 1,
+        "selling_price_list": selling_price_list,
+        "price_list_currency": price_list_currency,
+        "plc_conversion_rate": plc_conversion_rate or 1,
+        "conversion_rate": conversion_rate or 1,
     }
 
+    if applied_template:
+        si_data["item_group_template"] = applied_template
+
     # safety defaults
-    si_data["selling_price_list"]  = selling_price_list or "Standard Selling"
+    si_data["selling_price_list"] = selling_price_list or "Standard Selling"
     si_data["price_list_currency"] = price_list_currency or currency
     si_data["plc_conversion_rate"] = plc_conversion_rate or 1
-    si_data["conversion_rate"]     = conversion_rate or 1
+    si_data["conversion_rate"] = conversion_rate or 1
 
     # after building si_data and before frappe.get_doc(...)
     if str(payload.get("disable_rounded_total", 0)).lower() in ("1", "true"):
         si_data["disable_rounded_total"] = 1
 
-    # Avoid double-discount: only apply invoice-level if NO item has discount
-    if payload.get("discount_amount"):
-        any_row_discount = any(
-            flt(it.get("discount_amount") or 0) > 0 or flt(it.get("discount_percentage") or 0) > 0
-            for it in items
-        )
-        if not any_row_discount:
-            si_data["apply_discount_on"] = payload.get("apply_discount_on") or "Net Total"
-            si_data["discount_amount"] = float(payload["discount_amount"])
+    # Apply invoice-level discount ONLY for non-kit items
+    if payload.get("discount_amount") and not kit_discount_applied:
+        si_data["apply_discount_on"] = payload.get("apply_discount_on") or "Net Total"
+        si_data["discount_amount"] = float(payload["discount_amount"])
 
     # patient field if present
     if frappe.get_meta("Sales Invoice").has_field("patient") and patient:
@@ -602,11 +738,10 @@ def _create_sales_invoice(payload, customer, patient):
     si_meta = frappe.get_meta("Sales Invoice")
 
     def _add_custom(fieldname, value):
-        """Set si_data[fieldname] only if the field exists and value is non-empty."""
         if si_meta.has_field(fieldname) and value not in (None, "", []):
             si_data[fieldname] = value
 
-    # Normalize order_source to your allowed options
+    # Normalize order_source to allowed options
     _src_raw = (payload.get("order_source") or "").strip().lower()
     _src_map = {
         "shopify":  "Shopify",
@@ -617,29 +752,28 @@ def _create_sales_invoice(payload, customer, patient):
     }
     _src_val = _src_map.get(_src_raw) or (payload.get("order_source") or "Other")
 
-    # Large numeric IDs (e.g., Shopify) can exceed INT range in MariaDB.
-    # Store as string when very large; otherwise keep original.
+    # Shopify IDs can exceed INT limit
     def _safe_id(val):
         try:
             n = int(val)
             return str(n) if n > 2147483647 else n
         except Exception:
-            return val  # already string/None
+            return val
 
-    _add_custom("shopify_order_id",     _safe_id(payload.get("shopify_order_id")))
+    _add_custom("shopify_order_id", _safe_id(payload.get("shopify_order_id")))
     _add_custom("shopify_order_number", _safe_id(payload.get("shopify_order_number")))
-    _add_custom("buopso_order_id",      _safe_id(payload.get("buopso_order_id")))
-    _add_custom("order_source",         _src_val)
-
-    # frappe.log_error(title="SIYA DEBUG: SI data", message=frappe.as_json(si_data))
+    _add_custom("buopso_order_id", _safe_id(payload.get("buopso_order_id")))
+    _add_custom("order_source", _src_val)
 
     si = frappe.get_doc(si_data)
     si.flags.ignore_permissions = True
     si.set_missing_values()
     si.calculate_taxes_and_totals()
     si.insert()
+
     if payload.get("submit_invoice", 1):
         si.submit()
+
     return si.name
 
 # ------------------------------
@@ -719,7 +853,7 @@ def _create_payment_entry(payload, customer, sales_invoice):
 # ------------------------------
 
 @frappe.whitelist(allow_guest=False, methods=["POST"])
-def create_full_invoice():
+def create_shopify_order():
     """
     Creates/links Patient, Customer, Address, Contact -> Sales Invoice -> Payment Entry.
     Uses patient_same_as_customer=1 to auto-fill patient fields.
@@ -728,8 +862,9 @@ def create_full_invoice():
     """
     payload = _get_json()
     res = {}
+
     try:
-        frappe.db.savepoint("start_create_full_invoice")
+        frappe.db.savepoint("start_create_shopify_order")
 
         customer = _get_or_create_customer(payload)
         patient = _get_or_create_patient(payload, customer)
@@ -746,10 +881,15 @@ def create_full_invoice():
             "sales_invoice": si,
             "payment_entry": pe
         }
+
         frappe.db.commit()
+
     except Exception:
-        frappe.db.rollback(save_point="start_create_full_invoice")
-        frappe.log_error(title="create_full_invoice failed", message=frappe.get_traceback())
-        frappe.throw("Failed to create documents. See Error Log.")
+        frappe.db.rollback(save_point="start_create_shopify_order")
+        frappe.log_error(
+            title="create_shopify_order failed",
+            message=frappe.get_traceback()
+        )
+        frappe.throw("Failed to create Shopify order. See Error Log.")
 
     return res

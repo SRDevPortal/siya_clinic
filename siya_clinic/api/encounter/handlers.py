@@ -1,0 +1,1039 @@
+# siya_clinic/api/encounter_flow/handlers.py
+
+"""
+Event handlers for Patient Encounter doctype:
+- set_created_by_agent
+- Encounter -> create Draft Sales Invoice + Draft Payment Entry(s)
+- helpers for tax, warehouse, customer resolution, etc.
+"""
+
+from typing import Optional, List, Dict, Any
+import frappe
+from frappe.utils import flt, nowdate
+from erpnext.accounts.party import get_party_account
+
+# Encounter Master variables
+F_ENCOUNTER_TYPE = "sr_encounter_type" # "Followup" / "Order"
+F_ENCOUNTER_PLACE = "sr_encounter_place" # "Online" / "OPD"
+F_SALES_TYPE = "sr_sales_type" # Link SR Sales Type
+F_SOURCE = "sr_encounter_source" # Link Lead Source
+
+# Encounter Draft Invoice variables
+F_DELIVERY_TYPE = "sr_delivery_type" # Link SR Delivery Type (in Draft Invoice tab)
+ORDER_ITEMS_TABLE = "sr_pe_order_items" # Table → SR Order Item
+
+# Sales Invoice variables
+SI_F_ENCOUNTER_PLACE = "sr_si_encounter_place"
+SI_F_SALES_TYPE = "sr_si_sales_type"
+SI_F_ORDER_SOURCE = "sr_si_order_source"
+SI_F_DELIVERY_TYPE = "sr_si_delivery_type"
+
+# Optional back-link on SI (create if you like)
+SI_F_SOURCE_ENCOUNTER = "source_encounter" # Link → Patient Encounter (optional)
+
+# Tax templates (adjust names if yours differ)
+TAX_TEMPLATE_INTRASTATE = "Output GST In-state"
+TAX_TEMPLATE_INTERSTATE = "Output GST Out-state"
+
+# If True also writes to SI POS payments (GL on submit) — keep False if you use PEs
+USE_POS_PAYMENTS_ROW = False
+
+DEFAULT_FALLBACK_WAREHOUSE: Optional[str] = None
+
+ROW_KEYS = {
+    "item_code": ["sr_item_code", "item_code"],
+    "item_name": ["sr_item_name", "item_name"],
+    "uom": ["sr_item_uom", "uom"],
+    "qty": ["sr_item_qty", "qty"],
+    "rate": ["sr_item_rate", "rate"],
+}
+
+# ---------------- Helper functions ----------------
+def _row_get(row: Dict[str, Any], key: str, default=None):
+    for k in ROW_KEYS.get(key, []):
+        val = row.get(k)
+        if val not in (None, ""):
+            return val
+    return default
+
+
+def _get_item_selling_rate(item_code: str, price_list: str = "Standard Selling") -> float:
+    """
+    Fetch actual selling price from Item Price.
+    Used for Sales Invoice item rate.
+    (NOT encounter rate)
+    """
+    filters = {
+        "item_code": item_code,
+        "price_list": price_list,
+    }
+
+    rate = frappe.db.get_value(
+        "Item Price",
+        filters,
+        "price_list_rate"
+    )
+    return flt(rate or 0)
+
+
+def _find_item_rows(doc) -> List[Dict[str, Any]]:
+    rows = doc.get(ORDER_ITEMS_TABLE)
+    return rows or []
+
+
+def _has_any_attachment(doc) -> bool:
+    """True if the doc has any File attached via the sidebar."""
+    return bool(frappe.get_all(
+        "File",
+        filters={"attached_to_doctype": doc.doctype, "attached_to_name": doc.name},
+        limit=1
+    ))
+
+
+def _is_stock_item(item_code: str) -> int:
+    return frappe.db.get_value("Item", item_code, "is_stock_item") or 0
+
+
+def _valid_warehouse(wh_name: Optional[str], company: str) -> bool:
+    if not wh_name or not frappe.db.exists("Warehouse", wh_name):
+        return False
+    return frappe.db.get_value("Warehouse", wh_name, "company") == company
+
+
+def _is_order_online(doc) -> bool:
+    # Treat Encounter as billable when sr_encounter_type == "Order" AND sr_encounter_place is either "Online" or "OPD"
+    return (
+        str(doc.get(F_ENCOUNTER_TYPE) or "").strip().lower() == "order"
+        and str(doc.get(F_ENCOUNTER_PLACE) or "").strip().lower() in ("online", "opd")
+    )
+
+
+def _get_or_create_customer_from_patient(doc) -> str:
+    if not doc.get("patient"):
+        frappe.throw("Patient is required on the Encounter to create billing documents.")
+    customer = frappe.db.get_value("Patient", doc.patient, "customer")
+    if customer:
+        return customer
+    patient_name = frappe.db.get_value("Patient", doc.patient, "patient_name") or doc.patient
+    return _ensure_customer(patient_name, doc.company)
+
+
+def _ensure_customer(customer_name: str, company: str) -> str:
+    existing = frappe.db.get_value("Customer", {"customer_name": customer_name})
+    if existing:
+        return existing
+    c = frappe.new_doc("Customer")
+    c.customer_name = customer_name
+    c.customer_group = frappe.db.get_single_value("Selling Settings", "customer_group") or "All Customer Groups"
+    c.territory = frappe.db.get_single_value("Selling Settings", "territory") or "All Territories"
+    c.company = company
+    c.flags.ignore_permissions = True
+    c.insert(ignore_permissions=True)
+    return c.name
+
+
+def _resolve_encounter_warehouse(doc) -> str:
+    """
+    Decide warehouse based on Encounter Place + User Role + Company.
+    Works safely for multi-company setups.
+    """
+    place = (doc.get("sr_encounter_place") or "").strip().lower()
+    company = doc.company
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+
+    def get_company_warehouse(keyword):
+        """Find warehouse by keyword for this company."""
+        wh = frappe.db.get_value(
+            "Warehouse",
+            {"company": company, "warehouse_name": ["like", f"%{keyword}%"]},
+            "name"
+        )
+        return wh
+
+    # ---------------- Admin / System Manager ----------------
+    if "Administrator" in roles or "System Manager" in roles:
+        if place == "opd":
+            wh = get_company_warehouse("OPD")
+        else:
+            wh = get_company_warehouse("Packaging")
+
+        if not wh:
+            frappe.throw(f"No warehouse found for {company} ({place})")
+        return wh
+
+    # ---------------- OPD Encounter ----------------
+    if place == "opd":
+        if "OPD Biller" not in roles:
+            frappe.throw("You are not allowed to submit OPD Encounters.")
+
+        wh = get_company_warehouse("OPD")
+        if not wh:
+            frappe.throw(f"No OPD warehouse found for company {company}")
+        return wh
+
+    # ---------------- Online Encounter ----------------
+    if place == "online":
+        if "Packaging Biller" not in roles:
+            frappe.throw("You are not allowed to submit Online Encounters.")
+
+        wh = get_company_warehouse("Packaging")
+        if not wh:
+            frappe.throw(f"No Packaging warehouse found for company {company}")
+        return wh
+
+    frappe.throw("Invalid Encounter Place. Warehouse cannot be resolved.")
+
+
+def _sanitize_si_warehouses(si, company: str) -> None:
+    for row in si.items:
+        if not _is_stock_item(row.item_code):
+            row.warehouse = None
+        elif not _valid_warehouse(row.warehouse, company):
+            wh = frappe.db.get_value("Item Default", {"parent": row.item_code, "company": company}, "default_warehouse")
+            if not _valid_warehouse(wh, company):
+                wh = DEFAULT_FALLBACK_WAREHOUSE if (DEFAULT_FALLBACK_WAREHOUSE and _valid_warehouse(DEFAULT_FALLBACK_WAREHOUSE, company)) else None
+            row.warehouse = wh
+
+
+def _get_primary_address_for(doctype: str, name: str) -> Optional[str]:
+    if doctype == "Customer":
+        addr = frappe.db.get_value("Customer", name, "customer_primary_address")
+        if addr and frappe.db.exists("Address", addr):
+            return addr
+    links = frappe.get_all("Dynamic Link", filters={"parenttype": "Address", "link_doctype": doctype, "link_name": name}, fields=["parent"], order_by="modified desc", limit=20)
+    if not links:
+        return None
+    for dl in links:
+        if frappe.db.get_value("Address", dl.parent, "is_primary_address"):
+            return dl.parent
+    return links[0]["parent"]
+
+
+def _get_address_state(addr_name: Optional[str]) -> Optional[str]:
+    return frappe.db.get_value("Address", addr_name, "state") if addr_name else None
+
+
+def _get_customer_state(customer: str) -> Optional[str]:
+    return _get_address_state(_get_primary_address_for("Customer", customer))
+
+
+def _get_company_state(company: str) -> Optional[str]:
+    return _get_address_state(_get_primary_address_for("Company", company))
+
+
+def _get_company_primary_address(company: str) -> Optional[str]:
+    links = frappe.get_all("Dynamic Link", filters={"parenttype": "Address", "link_doctype": "Company", "link_name": company}, fields=["parent"], limit=100)
+    if not links:
+        return None
+    addr_names = [dl.parent for dl in links if dl.parent]
+    primary = frappe.get_all("Address", filters={"name": ["in", addr_names], "is_primary_address": 1}, fields=["name"], limit=1)
+    if primary:
+        return primary[0]["name"]
+    recent = frappe.get_all("Address", filters={"name": ["in", addr_names]}, fields=["name"], order_by="modified desc", limit=1)
+    return recent[0]["name"] if recent else None
+
+
+def _choose_tax_template_by_state(company: str, customer: str) -> Optional[str]:
+    cust_state = (_get_customer_state(customer) or "").strip().lower()
+    comp_state = (_get_company_state(company) or "").strip().lower()
+    if not cust_state or not comp_state:
+        return None
+    intrastate = cust_state == comp_state
+    prefer_name = TAX_TEMPLATE_INTRASTATE if intrastate else TAX_TEMPLATE_INTERSTATE
+    tmpl = frappe.db.get_value("Sales Taxes and Charges Template", {"company": company, "disabled": 0, "name": prefer_name}, "name")
+    if tmpl:
+        return tmpl
+    keyword = "In-state" if intrastate else "Out-state"
+    tmpl = frappe.db.get_value("Sales Taxes and Charges Template", {"company": company, "disabled": 0, "name": ["like", f"%{keyword}%"]}, "name") \
+        or frappe.db.get_value("Sales Taxes and Charges Template", {"company": company, "disabled": 0, "title": ["like", f"%{keyword}%"]}, "name")
+    return tmpl
+
+
+def _set_tax_template_by_state(si, customer: str) -> None:
+    tmpl = _choose_tax_template_by_state(si.company, customer)
+    if tmpl:
+        si.taxes_and_charges = tmpl
+        si.set("taxes", [])
+
+
+def _apply_company_tax_template(si) -> None:
+    if si.taxes_and_charges:
+        return
+    tmpl = frappe.db.get_value("Sales Taxes and Charges Template", {"company": si.company, "is_default": 1, "disabled": 0}, "name")
+    if not tmpl:
+        tmpl = frappe.db.get_value("Sales Taxes and Charges Template", {"company": si.company, "disabled": 0}, "name")
+    if tmpl:
+        si.taxes_and_charges = tmpl
+        si.set("taxes", [])
+
+
+def _company_safe_tax_rows(si) -> None:
+    fixed = []
+    for t in list(si.get("taxes") or []):
+        acc = getattr(t, "account_head", None)
+        if not acc:
+            continue
+        acc_doc = frappe.db.get_value("Account", acc, ["company", "account_name", "account_number"], as_dict=True)
+        if not acc_doc:
+            continue
+        if acc_doc.company == si.company:
+            fixed.append(t);
+            continue
+        mapped = frappe.db.get_value("Account", {"company": si.company, "account_name": acc_doc.account_name, "is_group": 0}, "name")
+        if not mapped and acc_doc.account_number:
+            mapped = frappe.db.get_value("Account", {"company": si.company, "account_number": acc_doc.account_number, "is_group": 0}, "name")
+        if mapped:
+            t.account_head = mapped
+            fixed.append(t)
+    si.set("taxes", fixed)
+
+
+def _party_account(company: str, party_type: str, party: str) -> Optional[str]:
+    try:
+        return get_party_account(party_type, party, company)
+    except TypeError:
+        try:
+            return get_party_account(company, party_type, party)
+        except Exception:
+            return None
+    except Exception:
+        return None
+
+
+def _mop_account(company: str, mop: str) -> Optional[str]:
+    acc = frappe.db.get_value("Mode of Payment Account", {"parent": mop, "company": company}, "default_account")
+    if not acc:
+        acc = frappe.db.get_value("Mode of Payment Account", {"parent": mop, "company": company}, "account")
+    return acc
+
+
+def _create_draft_payment_entry(
+    encounter,
+    customer,
+    mop,
+    amount,
+    intended_si_name,
+    reference_no=None,
+    reference_date=None,
+    order_source=None,
+    encounter_place=None,
+    sales_type=None,
+    delivery_type=None,
+) -> str:
+    """
+    Create a draft Payment Entry (ignore_permissions) and return name.
+    Now accepts optional reference_no and reference_date (from multi-payment row).
+    """
+    pe = frappe.new_doc("Payment Entry")
+    pe.update({
+        "payment_type": "Receive",
+        "company": encounter.company,
+        "posting_date": nowdate(),
+        "mode_of_payment": mop,
+        "party_type": "Customer",
+        "party": customer,
+        # set readable party_name so list view shows friendly name
+        "party_name": getattr(encounter, "patient_name", None) or (
+            frappe.db.get_value("Patient", encounter.get("patient"), "patient_name")
+            if encounter.get("patient") else None
+        ),
+        "paid_amount": amount,
+        "received_amount": amount,
+        "reference_no": reference_no,
+        "reference_date": reference_date,
+    })
+
+    # HRMS override expects party_account prefilled
+    party_acc = _party_account(encounter.company, "Customer", customer) \
+        or frappe.db.get_value("Company", encounter.company, "default_receivable_account")
+    if party_acc:
+        pe.party_account = party_acc
+        pe.paid_from = party_acc  # for Receive
+
+    paid_to_acc = _mop_account(encounter.company, mop)
+    if paid_to_acc:
+        pe.paid_to = paid_to_acc
+
+    # store intended SI id so we can auto-link on SI submit
+    if hasattr(pe, "intended_sales_invoice"):
+        pe.intended_sales_invoice = intended_si_name
+    
+    # --- NEW: map Encounter custom fields onto Payment Entry IF those fields exist ---
+    try:
+        pe_meta = frappe.get_meta("Payment Entry")
+        if order_source and pe_meta.has_field("sr_pe_order_source"):
+            pe.sr_pe_order_source = order_source
+        if encounter_place and pe_meta.has_field("sr_pe_encounter_place"):
+            pe.sr_pe_encounter_place = encounter_place
+        if sales_type and pe_meta.has_field("sr_pe_sales_type"):
+            pe.sr_pe_sales_type = sales_type
+        if delivery_type and pe_meta.has_field("sr_pe_delivery_type"):
+            pe.sr_pe_delivery_type = delivery_type
+    except Exception:
+        # non-fatal if meta lookup fails
+        frappe.log("Failed to map encounter meta fields to Payment Entry (non-fatal)")
+
+    pe.set_missing_values()
+    pe.flags.ignore_permissions = True
+    pe.insert(ignore_permissions=True)
+    return pe.name
+
+
+
+
+# ---------------- Event Handlers ----------------
+def validate_agent_status_change(doc, method):
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+
+    is_pure_agent = (
+        "Agent" in roles
+        and "System Manager" not in roles
+        and "Administrator" not in roles
+        and "Healthcare Practitioner" not in roles
+    )
+
+    if not is_pure_agent:
+        return
+
+    if doc.is_new():
+        return
+
+    db_status = frappe.db.get_value(
+        "Patient Encounter",
+        doc.name,
+        "sr_encounter_status"
+    )
+
+    if doc.sr_encounter_status != db_status:
+        frappe.throw("Agent is not allowed to change Encounter Status.")
+
+
+def validate_agent_followup_online_source(doc, method=None):
+    """
+    Ensure Encounter Source is provided for Online Follow-up / Order
+    encounters created or edited by Agents while in Draft state.
+    """
+    roles = frappe.get_roles(frappe.session.user)
+
+    # Run only for Agent role
+    if "Agent" not in roles:
+        return
+
+    # Apply only on Draft documents
+    if doc.docstatus != 0:
+        return
+
+    # Validate Online Follow-up / Order encounters
+    is_online = doc.sr_encounter_place == "Online"
+    is_followup_or_order = doc.sr_encounter_type in ("Followup", "Order")
+    has_source = bool(doc.sr_encounter_source)
+
+    if is_online and is_followup_or_order and not has_source:
+        frappe.throw(
+            "Encounter Source is mandatory for Online Follow-up or Order encounters.",
+            title="Missing Required Field"
+        )
+
+
+def validate_encounter_workflow(doc, method):
+    roles = frappe.get_roles(frappe.session.user)
+
+    db = {}
+    if not doc.is_new():
+        db = frappe.db.get_value(
+            "Patient Encounter",
+            doc.name,
+            ["sr_encounter_status", "payment_status", "prx_status", "dispatch_status"],
+            as_dict=True
+        ) or {}
+
+    current_status = db.get("sr_encounter_status") or doc.sr_encounter_status
+
+    TERMINAL_STATES = {
+        "Hold",
+        "Duplicate",
+        "Payment Disapproved",
+        "PRX Hold",
+        "Dispatched"
+    }
+
+    # HARD STOP
+    if current_status in TERMINAL_STATES:
+        frappe.throw("This Encounter is on hold / closed and cannot be modified.")
+
+    # =================================================
+    # AGENT
+    # =================================================
+    if "Agent" in roles:
+        doc.sr_encounter_status = "Draft"
+
+        if not doc.is_new() and current_status != "Draft":
+            frappe.throw("Agent cannot change Encounter Status")
+
+        if not doc.is_new() and (
+            doc.payment_status != db.get("payment_status") or
+            doc.prx_status != db.get("prx_status") or
+            doc.dispatch_status != db.get("dispatch_status")
+        ):
+            frappe.throw("Agent cannot update workflow fields")
+        return
+
+    # =================================================
+    # PAYMENT APPROVER
+    # =================================================
+    if "Payment Approver" in roles:
+        if current_status != "Payment Approval":
+            frappe.throw("Payment Approver can act only at Payment Approval")
+
+        if doc.prx_status != db.get("prx_status") or doc.dispatch_status != db.get("dispatch_status"):
+            frappe.throw("Payment Approver cannot update PRX or Dispatch")
+
+        if doc.payment_status != db.get("payment_status"):
+            if doc.payment_status == "Payment Approved":
+                doc.sr_encounter_status = "PRX Requested"
+
+            elif doc.payment_status == "Payment Disapproved":
+                if not doc.payment_hold_reason:
+                    frappe.throw("Payment Hold Reason is required")
+                doc.sr_encounter_status = "Payment Disapproved"
+        return
+
+    # =================================================
+    # DOCTOR PRX
+    # =================================================
+    if "Doctor PRX" in roles:
+        if current_status != "PRX Requested":
+            frappe.throw("Doctor PRX can act only at PRX Requested")
+
+        if doc.payment_status != db.get("payment_status") or doc.dispatch_status != db.get("dispatch_status"):
+            frappe.throw("Doctor PRX cannot update Payment or Dispatch")
+
+        if doc.prx_status != db.get("prx_status"):
+            if doc.prx_status == "PRX Hold":
+                if not doc.prx_hold_reason:
+                    frappe.throw("PRX Hold Reason required")
+                doc.sr_encounter_status = "PRX Hold"
+
+            elif doc.prx_status == "PRX Ready":
+                doc.sr_encounter_status = "Ready to Dispatch"
+        return
+
+    # =================================================
+    # PACKAGING BILLER
+    # =================================================
+    if "Packaging Biller" in roles:
+        if current_status != "Ready to Dispatch":
+            frappe.throw("Packaging Biller can act only at Ready to Dispatch")
+
+        if doc.payment_status != db.get("payment_status") or doc.prx_status != db.get("prx_status"):
+            frappe.throw("Packaging Biller cannot update Payment or PRX")
+
+        if doc.dispatch_status != db.get("dispatch_status"):
+            if doc.dispatch_status == "Dispatch":
+                doc.sr_encounter_status = "Dispatched"
+
+            elif doc.dispatch_status in ("Hold", "Duplicate"):
+                if not doc.dispatch_hold_reason:
+                    frappe.throw("Dispatch Hold Reason required")
+                doc.sr_encounter_status = doc.dispatch_status
+        return
+
+
+def set_created_by_agent(doc, method):
+    """Populate created_by_agent on insert only (so edits don't override)."""
+    # if not getattr(doc, "created_by_agent", None):
+    #     doc.created_by_agent = frappe.session.user
+    doc.created_by_agent = frappe.session.user
+
+
+# def set_default_encounter_status(doc, method):
+#     roles = frappe.get_roles(frappe.session.user)
+
+#     # Agent → always Draft
+#     if "Agent" in roles:
+#         doc.sr_encounter_status = "Draft"
+#         return
+
+#     # Online encounters → default Draft
+#     if doc.sr_encounter_place == "Online" and not doc.sr_encounter_status:
+#         doc.sr_encounter_status = "Draft"
+
+def set_default_encounter_status(doc, method):
+    roles = frappe.get_roles(frappe.session.user)
+
+    # Only on creation
+    if not doc.is_new():
+        return
+
+    # Agent creates → Draft
+    if "Agent" in roles:
+        doc.sr_encounter_status = "Draft"
+        return
+
+    # Non-agent Online creation → Draft (optional)
+    if doc.sr_encounter_place == "Online":
+        doc.sr_encounter_status = "Draft"
+
+
+def enforce_agent_encounter_place(doc, method=None):
+    """
+    Force Encounter Place = Online ONLY for pure Agent users.
+    Admin / Doctor / System Manager are allowed OPD.
+    """
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+
+    is_pure_agent = (
+        "Agent" in roles
+        and "System Manager" not in roles
+        and "Administrator" not in roles
+        and "Healthcare Practitioner" not in roles
+    )
+
+    if is_pure_agent:
+        doc.sr_encounter_place = "Online"
+
+
+def before_save_patient_encounter(doc, method):
+    """Clean invalid warehouses in Encounter order items; compute amount fallback."""
+    rows = _find_item_rows(doc)
+    company = doc.company
+    for it in rows:
+        item_code = _row_get(it, "item_code")
+        if not item_code:
+            continue
+
+        qty = flt(_row_get(it, "qty") or 0)
+        rate = flt(_row_get(it, "rate") or 0)
+        it.amount = qty * rate  # harmless if child doesn’t have 'amount'
+
+        wh = _row_get(it, "warehouse")
+        if not _is_stock_item(item_code):
+            if wh:
+                it["warehouse"] = None
+        else:
+            if wh and not _valid_warehouse(wh, company):
+                it["warehouse"] = None
+
+
+def clear_advance_dependent_fields(doc, method):
+    """
+    Clear enc_multi_payments unless Encounter is Order + (Online or OPD).
+
+    Note: If you want to treat an empty place as allowed (to match the JS's
+    `|| !place` behaviour), change the `place_allowed` logic to include `not place`.
+    """
+    etype = (str(doc.get(F_ENCOUNTER_TYPE) or "")).strip().lower()
+    place = (str(doc.get(F_ENCOUNTER_PLACE) or "")).strip().lower()
+
+    # Option A: strict — require Order AND place in ("online","opd")
+    place_allowed = place in ("online", "opd")
+
+    # Option B (if you want to match JS which shows when place is empty too):
+    # place_allowed = (place in ("online", "opd")) or (place == "")
+
+    is_order_for_any_place = (etype == "order" and place_allowed)
+
+    if not is_order_for_any_place:
+        # clear child table so payments don't persist accidentally
+        if getattr(doc, "enc_multi_payments", None):
+            doc.enc_multi_payments = []
+
+
+def validate_required_before_submit(doc, method):
+    """
+    Validate multi-mode payments when submitting the Encounter.
+
+    Rules:
+      - Only validates for Orders. Change to check place if you want to restrict to Online/OPD.
+      - For each enc_multi_payments row with positive mmp_paid_amount:
+          * mmp_mode_of_payment required
+          * mmp_reference_date required
+          * proof required: either mmp_payment_proof OR any sidebar attachment on the Encounter
+    """
+    try:
+        # Only validate for Orders — switch to `_is_order_online(doc)` if you want Online/OPD only
+        if str(doc.get(F_ENCOUNTER_TYPE) or "").strip().lower() != "order":
+            return
+
+        multi = getattr(doc, "enc_multi_payments", []) or []
+
+        # Collect rows that have positive amount (only these must be validated)
+        rows_to_check = []
+        for idx, r in enumerate(multi, start=1):
+            # r may be dict-like (from UI) or object-like (frappe doc)
+            try:
+                amt = flt(r.get("mmp_paid_amount") if isinstance(r, dict) else getattr(r, "mmp_paid_amount", 0) or 0)
+            except Exception:
+                amt = flt((getattr(r, "mmp_paid_amount", 0) if not isinstance(r, dict) else r.get("mmp_paid_amount", 0)) or 0)
+            if amt > 0:
+                rows_to_check.append((idx, r))
+
+        if not rows_to_check:
+            return
+
+        missing_msgs = []
+        for idx, r in rows_to_check:
+            if isinstance(r, dict):
+                mop = (r.get("mmp_mode_of_payment") or "").strip()
+                ref_no = r.get("mmp_reference_no")
+                ref_date = r.get("mmp_reference_date")
+                proof = r.get("mmp_payment_proof")
+            else:
+                mop = (getattr(r, "mmp_mode_of_payment", None) or "").strip()
+                ref_no = getattr(r, "mmp_reference_no", None)
+                ref_date = getattr(r, "mmp_reference_date", None)
+                proof = getattr(r, "mmp_payment_proof", None)
+
+            row_missing = []
+
+            # --- NEW LOGIC ---
+            # If mode is Cash → no reference fields or proof required
+            if mop.lower() == "cash":
+                pass  # nothing required
+
+            else:
+                # Mode ≠ Cash → all reference fields required
+                if not ref_no:
+                    row_missing.append("Reference No")
+                if not ref_date:
+                    row_missing.append("Reference Date")
+
+                # Proof required: either row-level OR sidebar attachment
+                has_proof = bool(proof) or _has_any_attachment(doc)
+                if not has_proof:
+                    row_missing.append("Payment Proof")
+
+            if row_missing:
+                missing_msgs.append(f"Row {idx}: " + ", ".join(row_missing))
+
+        if missing_msgs:
+            frappe.throw("Please complete payment rows before submit: " + " ; ".join(missing_msgs))
+
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "validate_required_before_submit_error")
+        # Re-raise to block submit if validation code itself fails.
+        raise
+
+
+
+# Create an Draft Sales Invoice from Encounter
+def create_billing_on_submit(doc, method):
+    """Run on Patient Encounter submit and create DRAFT SI (+ DRAFT PE if advance)."""
+    if doc.docstatus != 1:
+        return
+    if not _is_order_online(doc):
+        return
+    _create_billing_drafts_from_encounter(doc)
+
+
+def _create_billing_drafts_from_encounter(doc):
+    """The old create_billing_on_save body, but callable from on_submit."""
+
+    # Don’t duplicate
+    if getattr(doc, "sales_invoice", None):
+        return
+    existing = frappe.get_all(
+        "Sales Invoice",
+        filters={"docstatus": 0, "remarks": ["like", f"%Patient Encounter: {doc.name}%"]},
+        pluck="name",
+        limit=1,
+    )
+    if existing:
+        return
+
+    # Build SI (DRAFT)
+    customer = _get_or_create_customer_from_patient(doc)
+    item_rows = _find_item_rows(doc)
+    if not item_rows:
+        return  # no items → skip
+
+    si = frappe.new_doc("Sales Invoice")
+    si.update({
+        "customer": customer,
+        "company": doc.company,
+        "posting_date": nowdate(),
+        "due_date": nowdate(),
+        "remarks": f"Created from Patient Encounter: {doc.name}",
+    })
+
+    si_meta = frappe.get_meta("Sales Invoice")
+    if si_meta.has_field("patient") and doc.get("patient"):
+        si.patient = doc.patient
+        if si_meta.has_field("patient_name"):
+            si.patient_name = frappe.db.get_value("Patient", doc.patient, "patient_name")
+
+    if si_meta.has_field(SI_F_SOURCE_ENCOUNTER):
+        setattr(si, SI_F_SOURCE_ENCOUNTER, doc.name)
+
+    addr = _get_company_primary_address(doc.company)
+    if addr:
+        si.company_address = addr
+
+    safe_wh = _resolve_encounter_warehouse(doc)
+
+    if not _valid_warehouse(safe_wh, doc.company):
+        frappe.throw(
+            f"Resolved warehouse '{safe_wh}' does not belong to company {doc.company}"
+        )
+
+    if hasattr(si, "set_warehouse"):
+        si.set_warehouse = safe_wh
+
+    added = 0
+    for it in item_rows:
+        item_code = _row_get(it, "item_code")
+        if not item_code:
+            continue
+
+        qty = flt(_row_get(it, "qty") or 1)
+        # rate = flt(_row_get(it, "rate") or 0)
+        rate = _get_item_selling_rate(
+            item_code=item_code,
+            price_list="Standard Selling",
+        )
+        uom = _row_get(it, "uom")
+        name = _row_get(it, "item_name")
+
+        row = {
+            "item_code": item_code,
+            "item_name": name,
+            "description": it.get("description"),
+            "uom": uom,
+            "qty": qty,
+            "rate": rate,
+            "conversion_factor": it.get("conversion_factor") or 1,
+            "warehouse": safe_wh,
+            "income_account": it.get("income_account"),
+            "cost_center": it.get("cost_center"),
+        }
+
+        si.append("items", row)
+        added += 1
+
+    if added == 0:
+        frappe.throw("No valid items found in Draft Invoice → Items List. Please enter Item Code, Qty and Rate.")
+
+    # Map Encounter → Sales Invoice fields
+    if si_meta.has_field(SI_F_ORDER_SOURCE) and doc.get(F_SOURCE):
+        setattr(si, SI_F_ORDER_SOURCE, doc.get(F_SOURCE))
+    
+    if si_meta.has_field(SI_F_ENCOUNTER_PLACE) and doc.get(F_ENCOUNTER_PLACE):
+        setattr(si, SI_F_ENCOUNTER_PLACE, doc.get(F_ENCOUNTER_PLACE))
+    
+    if si_meta.has_field(SI_F_SALES_TYPE) and doc.get(F_SALES_TYPE):
+        setattr(si, SI_F_SALES_TYPE, doc.get(F_SALES_TYPE))
+    
+    if si_meta.has_field(SI_F_DELIVERY_TYPE) and doc.get(F_DELIVERY_TYPE):
+        setattr(si, SI_F_DELIVERY_TYPE, doc.get(F_DELIVERY_TYPE))
+
+    if doc.get("item_group_template") and si_meta.has_field("item_group_template"):
+        si.item_group_template = doc.item_group_template
+
+	# -------------------------------------------------
+    # sr_kit_total_price   = ENTERED price (Encounter)
+    # sr_item_total_price  = ACTUAL price (Item Price)
+    # -------------------------------------------------
+    actual_total_price = 0.0     # From Item Price (Standard Selling)
+    entered_total_price = 0.0    # From Encounter (Agent-entered)
+
+    kit_name = None
+
+    for idx, it in enumerate(doc.get("sr_pe_order_items") or []):
+        qty = flt(it.sr_item_qty or 0)
+
+        # Entered (discounted) rate from Encounter
+        entered_rate = flt(it.sr_item_rate or 0)
+
+        # Actual selling rate from Item Price
+        actual_rate = _get_item_selling_rate(
+            item_code=it.sr_item_code,
+            price_list="Standard Selling",
+        )
+
+        actual_total_price += qty * actual_rate
+        entered_total_price += qty * entered_rate
+
+        # First item defines Kit Name
+        if idx == 0:
+            kit_name = it.sr_item_name
+
+
+    # -------------------------------
+    # PASS VALUES TO SALES INVOICE
+    # -------------------------------
+    if si_meta.has_field("sr_kit_name") and kit_name:
+        setattr(si, "sr_kit_name", kit_name)
+
+    # Entered / discounted price (Encounter)
+    if si_meta.has_field("sr_kit_total_price"):
+        setattr(si, "sr_kit_total_price", entered_total_price)
+
+    # Actual price (Item Price)
+    # if si_meta.has_field("sr_item_total_price"):
+    #     setattr(si, "sr_item_total_price", actual_total_price)
+
+
+    # Taxes & totals
+    _set_tax_template_by_state(si, customer)
+    _apply_company_tax_template(si)
+    si.set_missing_values()
+    si.calculate_taxes_and_totals()
+    _company_safe_tax_rows(si)
+    si.calculate_taxes_and_totals()
+    _sanitize_si_warehouses(si, doc.company)
+
+    # --- NEW: compute advance summary from enc_multi_payments child table ---
+    multi_rows = getattr(doc, "enc_multi_payments", []) or []
+    total_advance = 0.0
+    mop_list = []
+    for m in multi_rows:
+        try:
+            amt = flt(getattr(m, "mmp_paid_amount", 0) or 0)
+        except Exception:
+            amt = flt((m.get("mmp_paid_amount") if isinstance(m, dict) else getattr(m, "mmp_paid_amount", 0)) or 0)
+        if amt > 0:
+            total_advance += amt
+            # collect mode of payment strings (skip empty)
+            mop_val = (getattr(m, "mmp_mode_of_payment", None) if not isinstance(m, dict) else m.get("mmp_mode_of_payment")) or None
+            if mop_val:
+                mop_list.append(str(mop_val).strip())
+
+    # Final guard on warehouses
+    for r in si.items:
+        if r.warehouse and not _valid_warehouse(r.warehouse, doc.company):
+            r.warehouse = None
+
+    si.flags.ignore_permissions = True
+    si.insert(ignore_permissions=True)  # KEEP DRAFT
+
+    # --- CREATE DRAFT PAYMENT ENTRY PER enc_multi_payments ROW (one PE per row) ---
+    pe_names = []
+    patient_name = None
+    try:
+        patient_name = frappe.db.get_value("Patient", doc.get("patient"), "patient_name") or getattr(doc, "patient_name", None) or getattr(doc, "patient", None)
+    except Exception:
+        patient_name = getattr(doc, "patient_name", None) or getattr(doc, "patient", None)
+
+    for m in multi_rows:
+        try:
+            m_amt = flt(getattr(m, "mmp_paid_amount", 0) or 0)
+            if m_amt <= 0:
+                continue
+            # prefer row-level mop, fallback to None (no doc-level mop)
+            m_mop = getattr(m, "mmp_mode_of_payment", None) or None
+
+            # row-level reference fields (if present)
+            m_ref_no = getattr(m, "mmp_reference_no", None) or (m.get("mmp_reference_no") if isinstance(m, dict) else None)
+            m_ref_date = getattr(m, "mmp_reference_date", None) or (m.get("mmp_reference_date") if isinstance(m, dict) else None)
+
+            pe_name = _create_draft_payment_entry(
+                doc,
+                customer,
+                m_mop,
+                m_amt,
+                si.name,
+                reference_no=m_ref_no,
+                reference_date=m_ref_date,
+                order_source=doc.get(F_SOURCE),
+                encounter_place=doc.get(F_ENCOUNTER_PLACE),
+                sales_type=doc.get(F_SALES_TYPE),
+                delivery_type=doc.get(F_DELIVERY_TYPE),
+            )
+
+            if not pe_name:
+                continue
+
+            # ensure readable party_name on the PE
+            try:
+                if patient_name:
+                    frappe.db.set_value("Payment Entry", pe_name, "party_name", patient_name, update_modified=False)
+            except Exception:
+                # non-fatal
+                pass
+
+            pe_names.append(pe_name)
+
+            # record created PE back on the child row (SR Multi Mode Payment)
+            try:
+                # m.name should be the child row name (frappe child doc)
+                frappe.db.set_value("SR Multi Mode Payment", m.name, {
+                    "mmp_payment_entry": pe_name,
+                    "mmp_posting_date": frappe.db.get_value("Payment Entry", pe_name, "posting_date")
+                }, update_modified=False)
+            except Exception:
+                frappe.log_error(frappe.get_traceback(),
+                                 f"Failed linking PE {pe_name} back to encounter child row {getattr(m,'name', '<no-name>')}")
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Failed creating PE from encounter multi payment row")
+
+    # commit DB changes if any PEs created
+    if pe_names:
+        frappe.db.commit()
+
+    # Back-links on Encounter, if fields exist
+    if hasattr(doc, "sales_invoice"):
+        doc.db_set("sales_invoice", si.name, update_modified=False)
+
+    # set encounter.payment_entry to first created PE (if you still use that field)
+    if pe_names and hasattr(doc, "payment_entry"):
+        doc.db_set("payment_entry", pe_names[0], update_modified=False)
+
+    # show message
+    if pe_names:
+        frappe.msgprint(
+            f"Created Draft Sales Invoice <b>{si.name}</b> and Draft Payment Entry(s) <b>{', '.join(pe_names)}</b>",
+            alert=True
+        )
+    else:
+        frappe.msgprint(f"Created Draft Sales Invoice <b>{si.name}</b>", alert=True)
+
+
+def link_pending_payment_entries(si, method):
+    """On SI submit, auto-append reference in any Draft PE that intended to pay this SI."""
+    if si.docstatus != 1:
+        return
+
+    pe_names = frappe.get_all(
+        "Payment Entry",
+        filters={
+            "docstatus": 0,
+            "company": si.company,
+            "party_type": "Customer",
+            "party": si.customer,
+            "intended_sales_invoice": si.name,
+        },
+        pluck="name",
+    )
+    if not pe_names:
+        return
+
+    outstanding = flt(si.get("outstanding_amount") or si.get("grand_total") or 0)
+    if outstanding <= 0:
+        return
+
+    for pe_name in pe_names:
+        if outstanding <= 0:
+            break
+
+        pe = frappe.get_doc("Payment Entry", pe_name)
+        already_alloc = sum(flt(r.allocated_amount) for r in (pe.get("references") or []))
+        pay_total = flt(pe.get("received_amount") or pe.get("paid_amount") or 0)
+        unallocated = max(pay_total - already_alloc, 0)
+        if unallocated <= 0:
+            continue
+
+        alloc = min(unallocated, outstanding)
+        pe.append("references", {
+            "reference_doctype": "Sales Invoice",
+            "reference_name": si.name,
+            "due_date": si.get("due_date") or si.get("posting_date"),
+            "allocated_amount": alloc,
+        })
+        pe.set_missing_values()
+        pe.flags.ignore_permissions = True
+        pe.save(ignore_permissions=True)
+
+        outstanding -= alloc
