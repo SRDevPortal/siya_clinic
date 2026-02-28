@@ -95,6 +95,8 @@ def apply():
 
     # Warehouse Masters
     _seed_company_warehouses_data()
+
+    _seed_roles()
     
     # create_bulk_payment_upload()
 
@@ -2497,28 +2499,26 @@ def _seed_company_warehouses_data():
 
 
 def _ensure_company_warehouse(company: str, warehouse_name: str):
-    """
-    Create warehouse if missing for a company.
-    """
-    full_name = f"{warehouse_name} - {company}"
-
-    if frappe.db.exists("Warehouse", full_name):
+    if frappe.db.get_value("Warehouse", {
+        "warehouse_name": warehouse_name,
+        "company": company
+    }):
         return
 
     parent = _get_company_root_warehouse(company)
 
-    wh = frappe.get_doc({
-        "doctype": "Warehouse",
-        "warehouse_name": warehouse_name,
-        "company": company,
-        "is_group": 0,
-        "parent_warehouse": parent,
-    })
+    try:
+        wh = frappe.get_doc({
+            "doctype": "Warehouse",
+            "warehouse_name": warehouse_name,
+            "company": company,
+            "is_group": 0,
+            "parent_warehouse": parent,
+        })
+        wh.insert(ignore_permissions=True, ignore_if_duplicate=True)
 
-    wh.insert(ignore_permissions=True)
-    frappe.db.commit()
-
-    logger.info(f"Created warehouse: {full_name}")
+    except frappe.DuplicateEntryError:
+        frappe.db.rollback()
 
 
 def _get_company_root_warehouse(company: str) -> str:
@@ -2553,6 +2553,50 @@ def _get_company_root_warehouse(company: str) -> str:
         return root_doc.name
 
     return root_name
+
+
+def _seed_roles():
+    roles = [
+        "Agent",
+        "Team Leader",
+        "Payment Approver",
+        "Doctor PRX",
+        "OPD Biller",
+        "Packaging Biller",
+    ]
+
+    for role_name in roles:
+        _ensure_role(role_name)
+        _ensure_role_profile(role_name, [role_name])
+
+
+def _ensure_role(role_name: str):
+    if frappe.db.exists("Role", role_name):
+        return
+
+    try:
+        frappe.get_doc({
+            "doctype": "Role",
+            "role_name": role_name,
+        }).insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+    except frappe.DuplicateEntryError:
+        frappe.db.rollback()
+
+
+def _ensure_role_profile(profile_name: str, roles: list[str]):
+    if frappe.db.exists("Role Profile", profile_name):
+        return
+
+    try:
+        frappe.get_doc({
+            "doctype": "Role Profile",
+            "role_profile": profile_name,
+            "roles": [{"role": r} for r in roles],
+        }).insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+    except frappe.DuplicateEntryError:
+        frappe.db.rollback()
 
 
 # def create_bulk_payment_upload():
