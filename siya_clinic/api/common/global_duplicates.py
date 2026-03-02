@@ -73,11 +73,16 @@ def validate_global_mobile(mobile, current_doctype, current_name):
         # ✅ allow if same entity
         if contact_belongs_to_entity(contact_name, current_doctype, current_name):
             pass
-        else:
-            # ✅ allow if contact belongs to same patient (Healthcare flow)
-            if current_doctype == "Contact":
-                return
-            frappe.throw(f"Mobile already linked with Contact: {contact_name}")
+
+        # ✅ allow Shopify API to reuse contact mobile
+        elif getattr(frappe.flags, "in_shopify_api", False):
+            return
+        
+        # ✅ allow if contact belongs to same patient (Healthcare flow)
+        elif current_doctype == "Contact":
+            return
+
+        frappe.throw(f"Mobile already linked with Contact: {contact_name}")
 
     # ---------------- PATIENT ----------------
     patient = frappe.db.get_value(
@@ -122,11 +127,19 @@ def validate_global_email(email, current_doctype, current_name):
     contact = frappe.db.get_value("Contact", {"email_id": email}, "name")
 
     if contact:
+        # ✅ allow if same entity
         if contact_belongs_to_entity(contact, current_doctype, current_name):
             pass
+
+        # ✅ allow Shopify API reuse
+        elif getattr(frappe.flags, "in_shopify_api", False):
+            return
+
+        # ✅ allow when saving Contact itself
+        elif current_doctype == "Contact":
+            return
+
         else:
-            if current_doctype == "Contact":
-                return
             frappe.throw(f"Email already linked with Contact: {contact}")
 
     # ---------------- PATIENT ----------------
