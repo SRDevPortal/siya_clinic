@@ -212,7 +212,7 @@ def _apply_patient_ui_customizations():
     upsert_property_setter(DT, "status", "in_standard_filter", "1", "Check")
 
     # ---------------- Contact Rules ----------------
-    upsert_property_setter(DT, "mobile", "reqd", "0", "Check")
+    upsert_property_setter(DT, "mobile", "reqd", "1", "Check")
     upsert_property_setter(DT, "mobile", "in_standard_filter", "1", "Check")
     upsert_property_setter(DT, "phone", "in_standard_filter", "1", "Check")
 
