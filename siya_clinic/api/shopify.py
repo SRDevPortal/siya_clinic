@@ -382,14 +382,26 @@ def _get_or_create_patient(payload, customer):
         if not last and l2:
             last = l2
 
-    # find existing
+    # ---------------------------------------
+    # find existing patient OR reuse contact mobile
+    # ---------------------------------------
     patient = None
+
+    # 1️⃣ If mobile exists in Patient → reuse
     if phone:
         patient = frappe.db.get_value("Patient", {"mobile": phone})
+
+    # 2️⃣ If mobile exists in Contact → reuse / allow patient creation
+    contact_name = None
+    if phone:
+        contact_name = frappe.db.get_value("Contact", {"mobile_no": phone})
+
+    # 3️⃣ fallback checks
     if not patient and email:
         patient = frappe.db.get_value("Patient", {"email": email})
+
     if not patient and full_name:
-        patient = frappe.db.get_value("Patient", {"patient_name": full_name})
+        patient = frappe.db.get_value("Patient", {"patient_name": full_name}) 
 
     meta = frappe.get_meta("Patient")
     has_first = meta.has_field("first_name")
@@ -856,10 +868,11 @@ def _create_payment_entry(payload, customer, sales_invoice):
 def create_shopify_order():
     """
     Creates/links Patient, Customer, Address, Contact -> Sales Invoice -> Payment Entry.
-    Uses patient_same_as_customer=1 to auto-fill patient fields.
-    Auto-applies GST taxes when not provided and both states are known.
-    Handles price list currency safely to avoid INR->None exchange rate errors.
     """
+
+    # ✅ Tell validators this is Shopify flow
+    frappe.flags.in_shopify_api = True
+
     payload = _get_json()
     res = {}
 
