@@ -20,7 +20,6 @@ app_include_css = [
 ]
 app_include_js = [
     "/assets/siya_clinic/js/patient/quick_entry_state_patch.js",
-    # "/assets/siya_clinic/js/item_group_template.js",
     "/assets/siya_clinic/js/item_group_template/item_defaults.js",
 ]
 
@@ -233,7 +232,6 @@ doctype_js = {
         "public/js/item/package_weight.js",
     ],
     "Sales Invoice": [
-        # "public/js/sales_invoice.js",
         "public/js/sales_invoice/template_loader.js",
         "public/js/sales_invoice/actions.js",
         "public/js/sales_invoice/barcode.js",
