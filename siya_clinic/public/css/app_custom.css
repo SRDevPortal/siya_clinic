@@ -1,0 +1,7 @@
+/* ======================================================
+  CRM Lead Customizations
+====================================================== */
+
+body[data-route="List/CRM Lead/List"] li.hide-default-assign {
+    display: none !important;
+}

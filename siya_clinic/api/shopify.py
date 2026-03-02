@@ -94,6 +94,31 @@ def _resolve_income_account(company, acc_from_payload=None):
     frappe.throw(f"No Income account found for company '{company}'. Set a default or pass 'income_account'.")
 
 
+def _resolve_paid_to_account(company, mode_of_payment=None, paid_to=None):
+    # explicit account passed?
+    if paid_to and frappe.db.exists("Account", {"name": paid_to, "company": company, "is_group": 0}):
+        return paid_to
+
+    # try MoP mapping
+    if mode_of_payment:
+        acc = frappe.db.get_value("Mode of Payment Account",
+                                  {"parent": mode_of_payment, "company": company},
+                                  "default_account") \
+              or frappe.db.get_value("Mode of Payment Account",
+                                     {"parent": mode_of_payment, "company": company},
+                                     "account")
+        if acc and frappe.db.exists("Account", {"name": acc, "company": company, "is_group": 0}):
+            return acc
+
+    # fallback: Cash, then Bank
+    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0}, "name")
+    if acc: return acc
+    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
+    if acc: return acc
+
+    frappe.throw(f"No Cash/Bank account found for company '{company}'. Map a Mode of Payment account or pass 'paid_to'.")
+
+
 def _resolve_cost_center(company, cc_from_payload=None):
     # prefer payload if valid
     if _valid_cost_center(cc_from_payload, company):
@@ -113,6 +138,36 @@ def _resolve_cost_center(company, cc_from_payload=None):
     frappe.throw(
         f"No leaf Cost Center found for company '{company}'. "
         f"Create one (Accounting → Cost Center) or pass 'cost_center' in items."
+    )
+
+
+def _get_receivable_account(company):
+    # 1️⃣ Company default
+    acc = frappe.get_value("Company", company, "default_receivable_account")
+    if acc:
+        return acc
+
+    # 2️⃣ Receivable account_type
+    acc = frappe.db.get_value(
+        "Account",
+        {"company": company, "account_type": "Receivable", "is_group": 0},
+        "name"
+    )
+    if acc:
+        return acc
+    
+    # 3️⃣ Fallback: Debtors account (ERPNext standard)
+    acc = frappe.db.get_value(
+        "Account",
+        {"company": company, "name": ["like", "%Debtors%"], "is_group": 0},
+        "name"
+    )
+    if acc:
+        return acc
+
+    frappe.throw(
+        f"No receivable account found for company '{company}'. "
+        "Set default_receivable_account in Company."
     )
 
 
@@ -261,32 +316,7 @@ def _ensure_item(it, company):
     return doc.name
 
 
-def _resolve_paid_to_account(company, mode_of_payment=None, paid_to=None):
-    # explicit account passed?
-    if paid_to and frappe.db.exists("Account", {"name": paid_to, "company": company, "is_group": 0}):
-        return paid_to
-
-    # try MoP mapping
-    if mode_of_payment:
-        acc = frappe.db.get_value("Mode of Payment Account",
-                                  {"parent": mode_of_payment, "company": company},
-                                  "default_account") \
-              or frappe.db.get_value("Mode of Payment Account",
-                                     {"parent": mode_of_payment, "company": company},
-                                     "account")
-        if acc and frappe.db.exists("Account", {"name": acc, "company": company, "is_group": 0}):
-            return acc
-
-    # fallback: Cash, then Bank
-    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Cash", "is_group": 0}, "name")
-    if acc: return acc
-    acc = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
-    if acc: return acc
-
-    frappe.throw(f"No Cash/Bank account found for company '{company}'. Map a Mode of Payment account or pass 'paid_to'.")
-
-
-# ---------- Currency helpers ----------
+# ---------- Curren# ---------- Currency helpers ----------
 def _safe_rate(from_curr, to_curr, posting_date):
     if not from_curr or not to_curr or from_curr == to_curr:
         return 1
@@ -672,7 +702,7 @@ def _create_sales_invoice(payload, customer, patient):
         "posting_date": posting_date,
         "due_date": due_date,
         "customer": customer,
-        "debit_to": "Debtors - EEPL",
+        "debit_to": _get_receivable_account(company),
         "items": si_items,
         "taxes": taxes,
         "ignore_pricing_rule": 1,

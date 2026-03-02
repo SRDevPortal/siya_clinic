@@ -4,12 +4,14 @@ import logging
 
 from . import (
     masters,
-    # patient, customer, practitioner, contact,
-    # encounter, crm_lead, patient_appointment,
-    # drug_prescription, item_price, item_package,
-    # sales_invoice, payment_entry, purchase_order, user, company,
-    # print_formats,
-    sales_invoice,
+    patient, customer, contact,
+    crm_lead,
+    practitioner, encounter,
+    drug_prescription, item, item_price,
+    sales_invoice, payment_entry,
+    purchase_order,
+    company,
+    print_formats,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,44 +41,44 @@ def setup_all():
         # -------------------------------------------------
         # Master Data fields/customizations
         # -------------------------------------------------
-        logger.info("Applying masters setup")
+        logger.info("Applying Masters setup")
         masters.apply()
 
         # -------------------------------------------------
         # Patient fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying patient setup")
-        # patient.apply()
+        logger.info("Applying Patient setup")
+        patient.apply()
 
         # -------------------------------------------------
         # Customer fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying customer setup")
-        # customer.apply()
-
-        # -------------------------------------------------
-        # Practitioner fields/customizations
-        # -------------------------------------------------
-        # logger.info("Applying practitioner setup")
-        # practitioner.apply()
+        logger.info("Applying Customer setup")
+        customer.apply()
 
         # -------------------------------------------------
         # Contact/Address fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying contact setup")
-        # contact.apply()
+        logger.info("Applying contact setup")
+        contact.apply()
+
+        # -------------------------------------------------
+        # Healthcare Practitioner fields/customizations
+        # -------------------------------------------------
+        logger.info("Applying Healthcare Practitioner setup")
+        practitioner.apply()
 
         # -------------------------------------------------
         # Patient Encounter fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying encounter setup")
-        # encounter.apply()
+        logger.info("Applying Patient Encounter setup")
+        encounter.apply()
 
         # -------------------------------------------------
         # CRM Lead fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying crm lead setup")
-        # crm_lead.apply()
+        logger.info("Applying crm lead setup")
+        crm_lead.apply()
 
         # -------------------------------------------------
         # Patient Appointment fields/customizations
@@ -87,20 +89,20 @@ def setup_all():
         # -------------------------------------------------
         # Drug Prescription fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying drug prescription setup")
-        # drug_prescription.apply()
+        logger.info("Applying drug prescription setup")
+        drug_prescription.apply()
 
         # -------------------------------------------------
         # Item Price fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying item price setup")
-        # item_price.apply()
+        logger.info("Applying item price setup")
+        item_price.apply()
 
         # -------------------------------------------------
         # Item Package fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying item package setup")
-        # item_package.apply()
+        logger.info("Applying item setup")
+        item.apply()
 
         # -------------------------------------------------
         # Sales Invoice fields/customizations
@@ -111,14 +113,14 @@ def setup_all():
         # -------------------------------------------------
         # Payment Entry fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying payment entry setup")
-        # payment_entry.apply()
+        logger.info("Applying payment entry setup")
+        payment_entry.apply()
 
         # -------------------------------------------------
         # Purchase Order fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying purchase order setup")
-        # purchase_order.apply()
+        logger.info("Applying purchase order setup")
+        purchase_order.apply()
 
         # -------------------------------------------------
         # User fields/customizations
@@ -129,17 +131,17 @@ def setup_all():
         # -------------------------------------------------
         # Company fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying company setup")
-        # company.apply()
+        logger.info("Applying company setup")
+        company.apply()
 
         # -------------------------------------------------
         # Print Format fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying print formats setup")
-        # print_formats.apply()
+        logger.info("Applying print formats setup")
+        print_formats.apply()
 
         # -------------------------------------------------
-        # Finalize
+        # Clear cache & commit
         # -------------------------------------------------
         frappe.clear_cache()
         frappe.db.commit()
