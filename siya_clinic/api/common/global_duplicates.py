@@ -21,7 +21,6 @@ def normalize_email(value):
 # ---------------------------------------------------------
 
 def get_contact_linked_entities(contact_name):
-    """Return valid linked entities for a Contact"""
     links = frappe.get_all(
         "Dynamic Link",
         filters={"parenttype": "Contact", "parent": contact_name},
@@ -37,7 +36,6 @@ def get_contact_linked_entities(contact_name):
 
 
 def contact_belongs_to_entity(contact_name, doctype, name):
-    """Check if contact belongs to current entity"""
     links = get_contact_linked_entities(contact_name)
 
     for link in links:
@@ -70,16 +68,39 @@ def validate_global_mobile(mobile, current_doctype, current_name):
     if contact_match:
         contact_name = contact_match[0][0]
 
-        # ✅ allow if same entity
+        # 1️⃣ Direct link allowed
         if contact_belongs_to_entity(contact_name, current_doctype, current_name):
-            pass
-
-        # ✅ allow Shopify API to reuse contact mobile
-        elif getattr(frappe.flags, "in_shopify_api", False):
             return
-        
-        # ✅ allow if contact belongs to same patient (Healthcare flow)
-        elif current_doctype == "Contact":
+
+        # 2️⃣ Allow if share same Customer
+        current_customer = None
+
+        if current_doctype == "Patient":
+            current_customer = frappe.db.get_value("Patient", current_name, "customer")
+
+        elif current_doctype == "Customer":
+            current_customer = current_name
+
+        if current_customer:
+            contact_customer_link = frappe.db.get_value(
+                "Dynamic Link",
+                {
+                    "parenttype": "Contact",
+                    "parent": contact_name,
+                    "link_doctype": "Customer"
+                },
+                "link_name"
+            )
+
+            if contact_customer_link and contact_customer_link == current_customer:
+                return
+
+        # 3️⃣ Shopify API reuse
+        if getattr(frappe.flags, "in_shopify_api", False):
+            return
+
+        # 4️⃣ Saving Contact itself
+        if current_doctype == "Contact":
             return
 
         frappe.throw(f"Mobile already linked with Contact: {contact_name}")
@@ -92,7 +113,6 @@ def validate_global_mobile(mobile, current_doctype, current_name):
     )
 
     if patient:
-        # allow if updating same patient via Contact save
         if current_doctype == "Contact":
             return
 
@@ -127,20 +147,43 @@ def validate_global_email(email, current_doctype, current_name):
     contact = frappe.db.get_value("Contact", {"email_id": email}, "name")
 
     if contact:
-        # ✅ allow if same entity
+
+        # 1️⃣ Direct link allowed
         if contact_belongs_to_entity(contact, current_doctype, current_name):
-            pass
-
-        # ✅ allow Shopify API reuse
-        elif getattr(frappe.flags, "in_shopify_api", False):
             return
 
-        # ✅ allow when saving Contact itself
-        elif current_doctype == "Contact":
+        # 2️⃣ Allow if share same Customer
+        current_customer = None
+
+        if current_doctype == "Patient":
+            current_customer = frappe.db.get_value("Patient", current_name, "customer")
+
+        elif current_doctype == "Customer":
+            current_customer = current_name
+
+        if current_customer:
+            contact_customer_link = frappe.db.get_value(
+                "Dynamic Link",
+                {
+                    "parenttype": "Contact",
+                    "parent": contact,
+                    "link_doctype": "Customer"
+                },
+                "link_name"
+            )
+
+            if contact_customer_link and contact_customer_link == current_customer:
+                return
+
+        # 3️⃣ Shopify reuse
+        if getattr(frappe.flags, "in_shopify_api", False):
             return
 
-        else:
-            frappe.throw(f"Email already linked with Contact: {contact}")
+        # 4️⃣ Saving Contact itself
+        if current_doctype == "Contact":
+            return
+
+        frappe.throw(f"Email already linked with Contact: {contact}")
 
     # ---------------- PATIENT ----------------
     patient = frappe.db.get_value(
