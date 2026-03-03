@@ -23,5 +23,14 @@ def normalize_customer_email(doc, method=None):
 
 
 def validate_customer_global_duplicates(doc, method=None):
+
+    # If mobile and email not changed, skip duplicate engine
+    if not doc.has_value_changed("mobile_no") and not doc.has_value_changed("email_id"):
+        return
+
+    # Skip strict duplicate check during Shopify API reuse
+    if getattr(frappe.flags, "in_shopify_api", False):
+        return
+
     validate_global_mobile(doc.mobile_no, "Customer", doc.name)
     validate_global_email(doc.email_id, "Customer", doc.name)
