@@ -58,10 +58,10 @@ doc_events = {
             "siya_clinic.api.patient.integrity.normalize_patient_email",
         ],
         "validate": [
-            # Normalize again (safe & idempotent)
+            # Normalize again (safe)
             "siya_clinic.api.patient.integrity.normalize_patient_contact_numbers",
             "siya_clinic.api.patient.integrity.normalize_patient_email",
-            # Global duplicate engine (single source of truth)
+            # Global duplicate engine
             "siya_clinic.api.patient.integrity.validate_patient_global_duplicates",
         ],
         "after_save": [
