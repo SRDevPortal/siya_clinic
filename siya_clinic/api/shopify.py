@@ -359,9 +359,13 @@ def _get_or_create_customer(payload):
 # ------------------------------
 # Patient  (patient=customer fallback supported)
 # ------------------------------
+# ------------------------------
+# Patient  (patient=customer fallback supported)
+# ------------------------------
 def _get_or_create_patient(payload, customer):
     """Create/reuse Patient. If patient_* not provided (or patient_same_as_customer=1),
     auto-fill from customer_* and populate first/last name when available."""
+
     same = payload.get("patient_same_as_customer")
     same = 1 if same in (1, "1", True, "true", "True") else 0
 
@@ -374,8 +378,23 @@ def _get_or_create_patient(payload, customer):
     phone = g("patient_phone", "customer_phone")
     sex = payload.get("patient_sex") or "Other"
 
+    # ---------------------------------------
+    # ✅ Department assignment (VERY IMPORTANT)
+    # ---------------------------------------
+    department = (payload.get("department_source") or "").strip()
+
+    if not department:
+        frappe.throw("department_source is required.")
+
+    if not frappe.db.exists("Medical Department", department):
+        frappe.throw(f"Medical Department '{department}' not found.")
+
+    # ---------------------------------------
+    # Name split logic
+    # ---------------------------------------
     first = payload.get("patient_first_name")
     last = payload.get("patient_last_name")
+
     if same or not (first or last):
         f2, l2 = _name_parts(full_name or email or phone or "Patient")
         first = first or f2
@@ -383,57 +402,76 @@ def _get_or_create_patient(payload, customer):
             last = l2
 
     # ---------------------------------------
-    # find existing patient OR reuse contact mobile
+    # Find existing patient
     # ---------------------------------------
     patient = None
 
-    # 1️⃣ If mobile exists in Patient → reuse
     if phone:
         patient = frappe.db.get_value("Patient", {"mobile": phone})
 
-    # 2️⃣ If mobile exists in Contact → reuse / allow patient creation
-    contact_name = None
-    if phone:
-        contact_name = frappe.db.get_value("Contact", {"mobile_no": phone})
-
-    # 3️⃣ fallback checks
     if not patient and email:
         patient = frappe.db.get_value("Patient", {"email": email})
 
     if not patient and full_name:
-        patient = frappe.db.get_value("Patient", {"patient_name": full_name}) 
+        patient = frappe.db.get_value("Patient", {"patient_name": full_name})
 
     meta = frappe.get_meta("Patient")
     has_first = meta.has_field("first_name")
     has_last = meta.has_field("last_name")
 
+    # ---------------------------------------
+    # ✅ Existing Patient Update Logic
+    # ---------------------------------------
     if patient:
         pdoc = frappe.get_doc("Patient", patient)
         updated = False
+
         if has_first and not pdoc.get("first_name") and first:
-            pdoc.first_name = first; updated = True
+            pdoc.first_name = first
+            updated = True
+
         if has_last and not pdoc.get("last_name") and last:
-            pdoc.last_name = last; updated = True
+            pdoc.last_name = last
+            updated = True
+
         if not pdoc.get("customer") and customer:
-            pdoc.customer = customer; updated = True
+            pdoc.customer = customer
+            updated = True
+
         if email and not pdoc.get("email"):
-            pdoc.email = email; updated = True
+            pdoc.email = email
+            updated = True
+
         if phone and not pdoc.get("mobile"):
-            pdoc.mobile = phone; updated = True
+            pdoc.mobile = phone
+            updated = True
+
+        # ✅ Department update if different
+        if pdoc.get("sr_medical_department") != department:
+            pdoc.sr_medical_department = department
+            updated = True
+
         if updated:
             pdoc.save(ignore_permissions=True)
+
         return pdoc.name
 
+    # ---------------------------------------
+    # ✅ New Patient Creation
+    # ---------------------------------------
     data = {
         "doctype": "Patient",
         "patient_name": full_name or first,
         "sex": sex,
         "mobile": phone,
         "email": email,
-        "customer": customer
+        "customer": customer,
+        "sr_medical_department": department
     }
+
     if has_first:
         data["first_name"] = first
+
     if has_last:
         data["last_name"] = last
 
