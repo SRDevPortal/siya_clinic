@@ -23,5 +23,14 @@ def normalize_patient_email(doc, method=None):
 
 
 def validate_patient_global_duplicates(doc, method=None):
+
+    # If mobile and email not changed, skip duplicate engine
+    if not doc.has_value_changed("mobile") and not doc.has_value_changed("email"):
+        return
+
+    # Skip duplicate validation for Shopify API
+    if getattr(frappe.flags, "in_shopify_api", False):
+        return
+
     validate_global_mobile(doc.mobile, "Patient", doc.name)
     validate_global_email(doc.email, "Patient", doc.name)
