@@ -1,17 +1,27 @@
 import frappe
+import logging
+
+logger = logging.getLogger(__name__)
 
 def set_patient_creator(doc, method=None):
     """
-    Populate created_by_agent on insert only.
-    Migrated from siya_clinic.
+    Automatically set the user who created the Patient.
+    Triggered on before_insert.
     """
 
-    # Run only for new records
-    if doc.is_new():
+    try:
+        # Run only for new records
+        if not doc.is_new():
+            return
 
-        # If field already set, do nothing
+        # Do not overwrite if already set
         if getattr(doc, "created_by_agent", None):
             return
 
-        # Set creator from session
+        # Set creator from session user
         doc.created_by_agent = frappe.session.user or "Administrator"
+    
+    except Exception:
+        logger.exception(
+            "Failed to set created_by_agent for Patient: %s", doc.name
+        )
