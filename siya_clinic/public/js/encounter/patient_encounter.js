@@ -114,14 +114,15 @@ function apply_encounter_access_rules(frm) {
 // ==========================================================
 function apply_active_master_filters(frm) {
 
-    frm.set_query("sr_encounter_type", () => ({ filters: { is_active: 1 } }));
-    frm.set_query("sr_encounter_place", () => ({ filters: { is_active: 1 } }));
-    frm.set_query("sr_sales_type", () => ({ filters: { is_active: 1 } }));
-    frm.set_query("sr_encounter_source", () => ({ filters: { is_active: 1 } }));
-    frm.set_query("sr_encounter_status", () => ({ filters: { is_active: 1 } }));
-    frm.set_query("sr_medication_template", () => ({ filters: { is_active: 1 } }));
-    frm.set_query("sr_delivery_type", () => ({ filters: { is_active: 1 } }));
-    frm.set_query("item_group_template", () => ({ filters: { is_active: 1 } }));
+    frm.set_query("sr_encounter_type", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("sr_encounter_place", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("sr_sales_type", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("sr_encounter_source", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("sr_encounter_status", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("diet_chart", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("sr_medication_template", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("sr_delivery_type", () => ({ filters: { is_active: 1 }, page_length: 100 }));
+    frm.set_query("item_group_template", () => ({ filters: { is_active: 1 }, page_length: 100 }));
 }
 
 
