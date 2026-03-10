@@ -39,48 +39,64 @@ def apply():
     create_lead_source_doctype()
     create_lead_disposition_doctype()
     
+    _seed_lead_platforms_data()
+    _seed_lead_sources_data()
+    _seed_additional_crm_lead_status_data()
+    _seed_lead_dispositions_data()
+    
     # Patient Masters
     create_state_doctype()
     _seed_states()
     
     create_dpt_disease_doctype()
+    _seed_dpt_diseases_data()
+    
     create_dpt_language_doctype()
+    _seed_dpt_languages_data()
+    
     create_patient_disable_reason_doctype()
+    _seed_patient_disable_reasons_data()
     
     create_followup_status_doctype()
-    _seed_followup_status_defaults()
+    _seed_followup_status_data()
     
     create_followup_id_doctype()
-    _seed_followup_ids()
+    _seed_followup_ids_data()
 
     create_followup_day_doctype()
-    _seed_followup_days()
+    _seed_followup_days_data()
 
     create_patient_invoice_view_doctype()
+    
     create_patient_payment_view_doctype()
 
     create_practitioner_pathy_doctype()
-    _seed_practitioner_pathies()
+    _seed_practitioner_pathies_data()
 
     # Create DocTypes for Encounter
     create_encounter_type_doctype()
     _seed_encounter_type_data()
+    
     create_encounter_place_doctype()
     _seed_encounter_place_data()
+    
     create_sales_type_doctype()
     _seed_sales_type_data()
+    
     create_encounter_status_doctype()
-    _seed_encounter_status_defaults()
+    _seed_encounter_status_data()
+    
     create_diet_chart()
 
     create_instruction()
     create_medication_template_item()
     create_medication_template()
 
-    seed_medication_class_data()
+    _seed_medication_classification_data()
 
     create_delivery_type()
     _seed_delivery_type_data()    
+    
     create_order_item()
     create_multi_mode_payment()
     
@@ -125,6 +141,7 @@ def create_lead_pipeline_doctype():
             "module": MODULE_DEF_NAME,
             "custom": 1,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "title_field": "sr_pipeline_name",
             "show_title_field_in_link": 1,
             "search_fields": "sr_pipeline_name",
@@ -206,6 +223,7 @@ def create_lead_platform_doctype():
             "module": MODULE_DEF_NAME,
             "custom": 1,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "title_field": "sr_platform_name",
             "show_title_field_in_link": 1,
             "search_fields": "sr_platform_name",
@@ -287,6 +305,7 @@ def create_lead_source_doctype():
             "module": MODULE_DEF_NAME,
             "custom": 1,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "title_field": "sr_source_name",
             "show_title_field_in_link": 1,
             "search_fields": "sr_source_name",
@@ -368,6 +387,7 @@ def create_lead_disposition_doctype():
             "module": MODULE_DEF_NAME,
             "custom": 1,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "title_field": "sr_disposition_name",
             "show_title_field_in_link": 1,
             "search_fields": "sr_disposition_name",
@@ -440,6 +460,145 @@ def create_lead_disposition_doctype():
 
         doc.insert(ignore_permissions=True)
         frappe.db.commit()
+
+
+def _seed_lead_platforms_data():
+    """Insert default SR Lead Platforms"""
+
+    platforms = [
+        "Interakt",
+        "Meta",
+        "Ozonetel",
+        "Website",
+    ]
+
+    for platform in platforms:
+        if not frappe.db.exists("SR Lead Platform", {"sr_platform_name": platform}):
+            frappe.get_doc({
+                "doctype": "SR Lead Platform",
+                "sr_platform_name": platform,
+                "is_active": 1
+            }).insert(ignore_permissions=True)
+
+            frappe.logger().info(f"SR Lead Platform created: {platform}")
+
+
+def _seed_lead_sources_data():
+    """Insert default SR Lead Sources"""
+
+    sources = [
+        "Facebook",
+        "Google",
+        "Instagram",
+        "Organic",
+        "Ozonetel",
+        "Shopify",
+        "Whatsapp Meta",
+        "Youtube",
+    ]
+
+    for source in sources:
+        if not frappe.db.exists("SR Lead Source", {"sr_source_name": source}):
+            frappe.get_doc({
+                "doctype": "SR Lead Source",
+                "sr_source_name": source,
+                "is_active": 1
+            }).insert(ignore_permissions=True)
+
+            frappe.logger("siya_clinic").info(f"SR Lead Source created: {source}")
+
+
+def _seed_additional_crm_lead_status_data():
+    """Insert additional CRM Lead Status without overriding defaults"""
+
+    statuses = [
+        {"lead_status": "Hot Lead", "type": "Open", "color": "green", "position": 8},
+        {"lead_status": "Existing Patient", "type": "Open", "color": "violet", "position": 9},
+        {"lead_status": "Unqualified Leads", "type": "Lost", "color": "red", "position": 10},
+        {"lead_status": "Financial Issue", "type": "Lost", "color": "yellow", "position": 11},
+        {"lead_status": "Not Answered", "type": "Ongoing", "color": "pink", "position": 12},
+        {"lead_status": "Follow up", "type": "Ongoing", "color": "blue", "position": 13},
+        {"lead_status": "Duplicate", "type": "Lost", "color": "gray", "position": 14},
+        {"lead_status": "Other Disease", "type": "Ongoing", "color": "cyan", "position": 15},
+        {"lead_status": "Other Language", "type": "Ongoing", "color": "amber", "position": 16},
+        {"lead_status": "Order Placed", "type": "Won", "color": "green", "position": 17},
+        {"lead_status": "Fresh", "type": "Open", "color": "purple", "position": 18},
+    ]
+
+    for s in statuses:
+        if not frappe.db.exists("CRM Lead Status", {"lead_status": s["lead_status"]}):
+            frappe.get_doc({
+                "doctype": "CRM Lead Status",
+                **s
+            }).insert(ignore_permissions=True)
+
+            frappe.logger("siya_clinic").info(
+                f"CRM Lead Status created: {s['lead_status']}"
+            )
+
+
+def _seed_lead_dispositions_data():
+    """Insert SR Lead Disposition master data"""
+
+    dispositions = [
+        {"name": "Sperm Donation", "status": "Unqualified Leads"},
+        {"name": "Hospitalized", "status": "Follow up"},
+        {"name": "Already Talked", "status": "Contacted"},
+        {"name": "Patient Expired", "status": "Unqualified Leads"},
+        {"name": "Non-treatable", "status": "Unqualified Leads"},
+        {"name": "Want Nearby treatment", "status": "Contacted"},
+        {"name": "Existing Pt Query", "status": "Existing Patient"},
+        {"name": "Discontinue Patient", "status": "Existing Patient"},
+        {"name": "Call Back", "status": "Contacted"},
+        {"name": "International Language", "status": "Other Language"},
+        {"name": "Udiya Language", "status": "Other Language"},
+        {"name": "Marathi Language", "status": "Other Language"},
+        {"name": "Kannada Language", "status": "Other Language"},
+        {"name": "Bengali Language", "status": "Other Language"},
+        {"name": "Telugu Language", "status": "Other Language"},
+        {"name": "Tamil Language", "status": "Other Language"},
+        {"name": "Want Discount", "status": "Financial Issue"},
+        {"name": "Can't Afford", "status": "Financial Issue"},
+        {"name": "Searching for Allopathy", "status": "Unqualified Leads"},
+        {"name": "Searching for Homeopathy", "status": "Unqualified Leads"},
+        {"name": "Taking Other Treatment", "status": "Unqualified Leads"},
+        {"name": "Not Interested", "status": "Unqualified Leads"},
+        {"name": "Busy", "status": "Not Answered"},
+        {"name": "General Queries", "status": "Contacted"},
+        {"name": "Fake Call", "status": "Duplicate"},
+        {"name": "Kidney Sale", "status": "Duplicate"},
+        {"name": "Scam", "status": "Duplicate"},
+        {"name": "Promotional Call", "status": "Duplicate"},
+        {"name": "Called By Mistake", "status": "Duplicate"},
+        {"name": "No Problem", "status": "Contacted"},
+        {"name": "Want Video Consultation", "status": "Follow up"},
+        {"name": "Want Appointment", "status": "Follow up"},
+        {"name": "Test Suggested", "status": "Follow up"},
+        {"name": "Reports Pending", "status": "Follow up"},
+        {"name": "Address Pending", "status": "Follow up"},
+        {"name": "Payment Pending", "status": "Follow up"},
+        {"name": "Family Discussion", "status": "Follow up"},
+        {"name": "Decision Pending", "status": "Follow up"},
+        {"name": "Not Serviceable", "status": "Unqualified Leads"},
+        {"name": "Number Blocked", "status": "Duplicate"},
+        {"name": "Switch Off", "status": "Not Answered"},
+        {"name": "Call Cut", "status": "Not Answered"},
+        {"name": "Images Pending", "status": "Follow up"},
+        {"name": "Not Reachable", "status": "Not Answered"},
+    ]
+
+    for d in dispositions:
+        if not frappe.db.exists("SR Lead Disposition", {"sr_disposition_name": d["name"]}):
+            frappe.get_doc({
+                "doctype": "SR Lead Disposition",
+                "sr_disposition_name": d["name"],
+                "sr_lead_status": d["status"],
+                "is_active": 1
+            }).insert(ignore_permissions=True)
+
+            frappe.logger("siya_clinic").info(
+                f"Lead Disposition created: {d['name']}"
+            )
 
 
 def create_state_doctype():
@@ -574,6 +733,7 @@ def create_dpt_disease_doctype():
             "module": MODULE_DEF_NAME,
             "custom": 1,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "title_field": "dept_disease_name",
             "show_title_field_in_link": 1,
             "search_fields": "dept_disease_name",
@@ -625,6 +785,104 @@ def create_dpt_disease_doctype():
         frappe.db.commit()
 
 
+def _seed_dpt_diseases_data():
+    """Insert default diseases"""
+
+    diseases = [
+        # Neurological Disorders
+        "Epilepsy",
+        "Parkinson's Disease",
+        "Paralysis",
+        "Migraine",
+        "Vertigo",
+        "Alzheimer's Disease",
+        "Neuropathy",
+
+        # Metabolic / Lifestyle Diseases
+        "Diabetes",
+        "Thyroid Disorder",
+        "Obesity",
+        "Hypertension",
+        "High Cholesterol",
+
+        # Respiratory Diseases
+        "Asthma",
+        "Bronchitis",
+        "COPD",
+        "Allergic Rhinitis",
+        "Sinusitis",
+
+        # Liver & Digestive Disorders
+        "Fatty Liver Disease",
+        "Hepatitis",
+        "Acidity / GERD",
+        "Peptic Ulcer",
+        "Irritable Bowel Syndrome (IBS)",
+        "Constipation",
+        "Piles / Hemorrhoids",
+
+        # Kidney & Urinary Disorders
+        "Kidney Disease",
+        "Kidney Stones",
+        "Urinary Tract Infection (UTI)",
+
+        # Skin & Hair Conditions
+        "Skin Allergy",
+        "Psoriasis",
+        "Eczema",
+        "Acne",
+        "Hair Loss / Alopecia",
+        "Dandruff",
+
+        # Joint & Musculoskeletal Disorders
+        "Arthritis",
+        "Back Pain",
+        "Joint Pain",
+        "Cervical Spondylosis",
+        "Sciatica",
+        "Osteoporosis",
+
+        # Mental Health
+        "Depression",
+        "Anxiety Disorder",
+        "Insomnia",
+        "Stress",
+
+        # Male Sexual Health
+        "Erectile Dysfunction",
+        "Premature Ejaculation",
+        "Low Libido",
+        "Male Infertility",
+
+        # Female Health
+        "Female Infertility",
+        "PCOS",
+        "PCOD",
+        "Irregular Periods",
+        "White Discharge",
+        "Menopause Symptoms",
+
+        # Cardiac
+        "Heart Disease",
+        "Arrhythmia",
+
+        # General / Misc
+        "General Weakness",
+        "Chronic Fatigue",
+        "Vitamin Deficiency",
+    ]
+
+    for disease in diseases:
+        if not frappe.db.exists("DPT Disease", {"dept_disease_name": disease}):
+            frappe.get_doc({
+                "doctype": "DPT Disease",
+                "dept_disease_name": disease,
+                "is_active": 1
+            }).insert(ignore_permissions=True)
+
+            frappe.logger("siya_clinic").info(f"DPT Disease created: {disease}")
+
+
 def create_dpt_language_doctype():
     """Create Regional Language master."""
 
@@ -640,6 +898,7 @@ def create_dpt_language_doctype():
             "module": MODULE_DEF_NAME,
             "custom": 1,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "title_field": "dept_language_name",
             "show_title_field_in_link": 1,
             "search_fields": "dept_language_name",
@@ -691,6 +950,35 @@ def create_dpt_language_doctype():
         frappe.db.commit()
 
 
+def _seed_dpt_languages_data():
+    """Insert default languages"""
+
+    languages = [
+        "Hindi",
+        "English",
+        "Odia",
+        "Marathi",
+        "Kannada",
+        "Bengali",
+        "Telugu",
+        "Tamil",
+        "Malayalam",
+        "Punjabi",
+        "Gujarati",
+        "Urdu",
+    ]
+
+    for language in languages:
+        if not frappe.db.exists("DPT Language", {"dept_language_name": language}):
+            frappe.get_doc({
+                "doctype": "DPT Language",
+                "dept_language_name": language,
+                "is_active": 1
+            }).insert(ignore_permissions=True)
+
+            frappe.logger("siya_clinic").info(f"DPT Language created: {language}")
+
+
 def create_patient_disable_reason_doctype():
     """Create SR Patient Disable Reason DocType if missing."""
 
@@ -704,13 +992,14 @@ def create_patient_disable_reason_doctype():
             "name": doctype,
             "module": MODULE_DEF_NAME,
             "custom": 1,
-            "autoname": "naming_series:",
+            # "autoname": "naming_series:",
+            "autoname": "field:sr_reason_name",
+            "allow_rename": 0,
             "title_field": "sr_reason_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "sr_reason_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
-            "allow_rename": 0,
             "fields": [
 
                 # 🔹 Naming Series
@@ -756,6 +1045,44 @@ def create_patient_disable_reason_doctype():
         frappe.db.commit()
 
 
+def _seed_patient_disable_reasons_data():
+    """Insert default Patient Disable Reasons"""
+
+    reasons = [
+        "Duplicate Patient ID",
+        "Courier Issue",
+        "Not Interested",
+        "Fresh RTO",
+        "Fresh Cancel",
+        "Can't Follow Diet & Exercise",
+        "Multiple Organ Failure",
+        "Dialysis Patient",
+        "Creatinine Increased",
+        "Vomiting after taking meds",
+        "Hospitalized",
+        "Skin Discoloration",
+        "Long NA",
+        "Condition Deteriorate",
+        "Recovered",
+        "No Improvement",
+        "No Results",
+        "Patient Expired",
+        "Financial Issue",
+    ]
+
+    for reason in reasons:
+        if not frappe.db.exists("SR Patient Disable Reason", {"sr_reason_name": reason}):
+            frappe.get_doc({
+                "doctype": "SR Patient Disable Reason",
+                "sr_reason_name": reason,
+                "is_active": 1
+            }).insert(ignore_permissions=True)
+
+            frappe.logger("siya_clinic").info(
+                f"Patient Disable Reason created: {reason}"
+            )
+
+
 def create_followup_status_doctype():
     """Create SR Followup Status DocType and insert default records."""
 
@@ -769,13 +1096,14 @@ def create_followup_status_doctype():
             "name": doctype,
             "module": MODULE_DEF_NAME,
             "custom": 1,
-            "autoname": "naming_series:",
+            # "autoname": "naming_series:",
+            "autoname": "field:status_name",
+            "allow_rename": 0,
             "title_field": "status_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "status_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
-            "allow_rename": 0,
             "fields": [
 
                 # 🔹 Naming Series
@@ -833,7 +1161,7 @@ def create_followup_status_doctype():
         frappe.db.commit()
 
 
-def _seed_followup_status_defaults():
+def _seed_followup_status_data():
     """Insert default follow-up statuses if missing."""
 
     defaults = [
@@ -1057,7 +1385,7 @@ def create_followup_id_doctype():
         frappe.db.commit()
 
 
-def _seed_followup_ids():
+def _seed_followup_ids_data():
     """Insert digits 0–9 safely."""
 
     for i in range(10):
@@ -1134,7 +1462,7 @@ def create_followup_day_doctype():
         frappe.db.commit()
 
 
-def _seed_followup_days():
+def _seed_followup_days_data():
     """Insert Mon–Sat safely."""
 
     days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -1165,12 +1493,12 @@ def create_practitioner_pathy_doctype():
             "module": MODULE_DEF_NAME,
             "custom": 1,
             "autoname": "field:sr_pathy_name",
+            "allow_rename": 0,
             "title_field": "sr_pathy_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "sr_pathy_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
-            "allow_rename": 0,
             "fields": [
                 {
                     "fieldname": "sr_pathy_name",
@@ -1211,8 +1539,8 @@ def create_practitioner_pathy_doctype():
         frappe.db.commit()
 
 
-def _seed_practitioner_pathies():
-    defaults = ["Ayurveda", "Allopathy", "Homeopathy" "Unani", "Siddha"]
+def _seed_practitioner_pathies_data():
+    defaults = ["Ayurveda", "Allopathy", "Homeopathy", "Unani", "Siddha"]
 
     for name in defaults:
         if not frappe.db.exists("SR Practitioner Pathy", {"sr_pathy_name": name}):
@@ -1239,9 +1567,9 @@ def create_encounter_type_doctype():
             "module": MODULE_DEF_NAME,
             # "autoname": "naming_series:",
             "autoname": "field:encounter_type_name",
-            # "naming_rule": "By fieldname",
+            "allow_rename": 0,
             "title_field": "encounter_type_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "encounter_type_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
@@ -1319,9 +1647,9 @@ def create_encounter_place_doctype():
             "module": MODULE_DEF_NAME,
             # "autoname": "naming_series:",
             "autoname": "field:encounter_place_name",
-            # "naming_rule": "By fieldname",
+            "allow_rename": 0,
             "title_field": "encounter_place_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "encounter_place_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
@@ -1399,9 +1727,9 @@ def create_sales_type_doctype():
             "module": MODULE_DEF_NAME,
             # "autoname": "naming_series:",
             "autoname": "field:sales_type_name",
-            # "naming_rule": "By fieldname",
+            "allow_rename": 0,
             "title_field": "sales_type_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "sales_type_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
@@ -1451,7 +1779,7 @@ def create_sales_type_doctype():
 
 def _seed_sales_type_data():
     """Seed the SR Sales Type data if missing"""
-    sales_types = ["Discontinue", "Fresh", "Repeat"]
+    sales_types = ["Fresh", "Repeat", "Discontinue"]
 
     for sales_type in sales_types:
         if not frappe.db.exists("SR Sales Type", {"sales_type_name": sales_type}):
@@ -1479,9 +1807,10 @@ def create_encounter_status_doctype():
             "module": MODULE_DEF_NAME,
             # "autoname": "naming_series:",
             "autoname": "field:status_name",
+            "allow_rename": 0,
             # "naming_rule": "By fieldname",
             "title_field": "status_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "status_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
@@ -1543,7 +1872,7 @@ def create_encounter_status_doctype():
         frappe.db.commit()
 
 
-def _seed_encounter_status_defaults():
+def _seed_encounter_status_data():
     """Insert default encounter statuses aligned with workflow."""
 
     statuses = [
@@ -1568,7 +1897,7 @@ def _seed_encounter_status_defaults():
         ("Dispatched", "#27ae60", 15),
 
         # --- Utility ---
-        ("Prx Print", "#f39c12", 16),
+        ("PRX Print", "#f39c12", 16),
         ("PNS", "#27ae60", 17),
     ]
 
@@ -1599,6 +1928,7 @@ def create_diet_chart():
             "name": doctype,
             "module": MODULE_DEF_NAME,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "naming_rule": "By fieldname",
             "title_field": "diet_chart_name",
             "show_title_field_in_link": 1,
@@ -1848,6 +2178,7 @@ def create_medication_template():
             "name": doctype,
             "module": MODULE_DEF_NAME,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "naming_rule": "By fieldname",
             "title_field": "sr_template_name",
             "show_title_field_in_link": 1,
@@ -1919,7 +2250,7 @@ def create_medication_template():
         frappe.db.commit()
 
 
-def seed_medication_class_data():
+def _seed_medication_classification_data():
     """Create Medication Class seed if missing."""
     medication_classes = [
         "Allopathic",
@@ -1956,10 +2287,10 @@ def create_delivery_type():
             "name": doctype,
             "module": MODULE_DEF_NAME,
             # "autoname": "naming_series:",
+            "allow_rename": 0,
             "autoname": "field:delivery_type_name",
-            # "naming_rule": "By fieldname",
             "title_field": "delivery_type_name",
-            "show_title_field_in_link": 1,
+            "show_title_field_in_link": 0,
             "search_fields": "delivery_type_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
@@ -2174,21 +2505,21 @@ def create_multi_mode_payment():
                     "fieldtype": "Link",
                     "options": "Mode of Payment",
                     "in_list_view": 1,
-                    "columns": 1,
+                    "columns": 2,
                 },
                 {
                     "fieldname": "mmp_reference_no",
                     "label": "Reference No",
                     "fieldtype": "Data",
                     "in_list_view": 1,
-                    "columns": 1,
+                    "columns": 2,
                 },
                 {
                     "fieldname": "mmp_reference_date",
                     "label": "Reference Date",
                     "fieldtype": "Date",
                     "in_list_view": 1,
-                    "columns": 1,
+                    "columns": 2,
                 },
                 {
                     "fieldname": "mmp_payment_proof",
@@ -2202,14 +2533,14 @@ def create_multi_mode_payment():
                     "label": "Payment Entry",
                     "fieldtype": "Link",
                     "options": "Payment Entry",
-                    "in_list_view": 1,
-                    "columns": 2,
+                    "in_list_view": 0,
+                    "columns": 1,
                 },
                 {
                     "fieldname": "mmp_posting_date",
                     "label": "Posting Date",
                     "fieldtype": "Date",
-                    "in_list_view": 1,
+                    "in_list_view": 0,
                     "columns": 1,
                 },
             ],
@@ -2293,9 +2624,11 @@ def create_item_group_template_doctype():
             "name": doctype,
             "module": MODULE_DEF_NAME,
             "autoname": "naming_series:",
+            "allow_rename": 0,
             "title_field": "template_name",
-            "search_fields": "template_name",
             "show_title_field_in_link": 1,
+            "search_fields": "template_name",
+            "show_name_in_global_search": 1,
             "track_changes": 1,
             "custom": 1,
             "fields": [
