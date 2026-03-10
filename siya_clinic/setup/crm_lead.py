@@ -69,6 +69,15 @@ def _make_crm_lead_fields():
                 "fieldtype": "Column Break",
                 "insert_after": "mobile_no",
             },
+            # {
+            #     "fieldname": "sr_lead_department",
+            #     "label": "Department",
+            #     "fieldtype": "Link",
+            #     "options": "Medical Department",
+            #     "in_list_view": 0,
+            #     "in_standard_filter": 1,
+            #     "insert_after": "sr_lead_personal_cb2",
+            # },
             {
                 "fieldname": "sr_lead_message",
                 "label": "Message",
@@ -116,7 +125,7 @@ def _make_crm_lead_fields():
                 "insert_after": "sr_lead_pa_tab",
             },
 
-            # ---------------- Meta Details TAB ----------------
+            # ---------- Meta Details tab for storing lead source tracking info (UTM, IP, etc.) ----------
             {"fieldname": "sr_meta_tab", "label": "Meta Details", "fieldtype": "Tab Break", "insert_after": "sr_lead_pa_launcher_html"},
 
             # ---------- General Tracking ----------
@@ -133,7 +142,7 @@ def _make_crm_lead_fields():
             {"fieldname": "sr_remote_location", "label": "Remote Location", "fieldtype": "Small Text", "read_only": 1, "insert_after": "sr_meta_general_cb2"},
             {"fieldname": "sr_user_agent", "label": "User Agent", "fieldtype": "Small Text", "read_only": 1, "insert_after": "sr_remote_location"},
 
-            # # ---------- Google Tracking ----------
+            # ---------- Google Tracking ----------
             {
                 "fieldname": "sr_meta_google_sb",
                 "label": "Google Tracking",
@@ -149,7 +158,7 @@ def _make_crm_lead_fields():
             {"fieldname": "sr_utm_term", "label": "UTM Term", "fieldtype": "Data", "read_only": 1, "insert_after": "sr_utm_medium"},
             {"fieldname": "sr_utm_adgroup_id", "label": "UTM Ad Group ID", "fieldtype": "Data", "read_only": 1, "insert_after": "sr_utm_term"},
 
-            # # ---------- Facebook Tracking ----------
+            # ---------- Facebook Tracking ----------
             {
                 "fieldname": "sr_meta_facebook_sb",
                 "label": "Facebook Tracking",
@@ -166,17 +175,18 @@ def _make_crm_lead_fields():
             {"fieldname": "sr_f_utm_medium", "label": "UTM Medium (Facebook)", "fieldtype": "Data", "read_only": 1, "insert_after": "sr_f_campaign_name"},
             {"fieldname": "sr_fbclid", "label": "FBCLID", "fieldtype": "Data", "length": 255, "read_only": 1, "insert_after": "sr_f_utm_medium"},
 
-            # # ---------- Interakt Tracking ----------
+            # ---------- Interakt Tracking ----------
             {
                 "fieldname": "sr_meta_interakt_sb",
                 "label": "Interakt Tracking",
                 "fieldtype": "Section Break",
                 "insert_after": "sr_fbclid",
-             },
+            },
             {"fieldname": "sr_w_source_id", "label": "W Source ID", "fieldtype": "Data", "read_only": 1, "insert_after": "sr_meta_interakt_sb"},
             {"fieldname": "sr_w_source_url", "label": "W Source URL", "fieldtype": "Data", "read_only": 1, "insert_after": "sr_w_source_id"},
             {"fieldname": "sr_w_ctwa_clid", "label": "W CTWA CLID", "fieldtype": "Data", "read_only": 1, "insert_after": "sr_w_source_url"},
-            {"fieldname": "sr_w_team_user", "label": "W Team User", "fieldtype": "Link", "options": "User", "read_only": 1, "insert_after": "sr_w_ctwa_clid"},
+            {"fieldname": "sr_w_team_id", "label": "W Team (Id)", "fieldtype": "Data", "hidden": 1, "read_only": 1, "insert_after": "sr_w_ctwa_clid"},
+            {"fieldname": "sr_w_team_user", "label": "W Team User", "fieldtype": "Link", "options": "User", "read_only": 1, "insert_after": "sr_w_team_id"},
         ]
     })
 
@@ -192,25 +202,25 @@ def _apply_crm_lead_ui_customizations():
     
     set_label(DT, "details", "Lead Details")
 
-    # # ---------- Status ----------
+    # ---------- Status ----------
     upsert_property_setter(DT, "status", "in_standard_filter", "1", "Check")
-    upsert_property_setter(DT, "status", "default", "New", "Data")
+    upsert_property_setter(DT, "status", "default", "Fresh", "Data")
 
-    # # ---------- Field Requirements ----------
+    # ---------- Field Requirements ----------
     upsert_property_setter(DT, "first_name", "reqd", "0", "Check")
     upsert_property_setter(DT, "mobile_no", "reqd", "1", "Check")
     upsert_property_setter(DT, "mobile_no", "in_list_view", "1", "Check")
     upsert_property_setter(DT, "mobile_no", "in_standard_filter", "1", "Check")
 
-    # # ---------- Lead Source ----------
+    # ---------- Lead Source ----------
     upsert_property_setter(DT, "source", "options", "SR Lead Source", "Link")
     upsert_property_setter(DT, "source", "in_list_view", "1", "Check")
     upsert_property_setter(DT, "source", "in_standard_filter", "1", "Check")
 
-    # # ---------- Rename Tab ----------
+    # ---------- Rename Tab ----------
     set_label(DT, "person_tab", "Patient Details")
 
-    # # ---------- Field Ordering ----------
+    # ---------- Field Ordering ----------
     ensure_field_after(DT, "middle_name", "first_name")
     ensure_field_after(DT, "lead_name", "last_name")
     ensure_field_after(DT, "phone", "mobile_no")
@@ -239,6 +249,8 @@ def _apply_crm_lead_ui_customizations():
         "sla_tab",
         # hide Syncing tab
         "syncing_tab",
+        # hide Lost Details tab
+        "lost_details_tab",
     )
 
     for fieldname in targets:

@@ -5,11 +5,10 @@ import logging
 from . import (
     masters,
     patient, customer, contact,
-    crm_lead,
-    practitioner, encounter,
-    drug_prescription, item, item_price,
-    sales_invoice, payment_entry,
-    purchase_order,
+    crm_lead, practitioner, patient_appointment,
+    encounter, drug_prescription, item, item_price,
+    sales_invoice, payment_entry, purchase_order,
+    # user,
     company,
     print_formats,
 )
@@ -59,8 +58,14 @@ def setup_all():
         # -------------------------------------------------
         # Contact/Address fields/customizations
         # -------------------------------------------------
-        logger.info("Applying contact setup")
+        logger.info("Applying Contact setup")
         contact.apply()
+
+        # -------------------------------------------------
+        # CRM Lead fields/customizations
+        # -------------------------------------------------
+        logger.info("Applying CRM Lead setup")
+        crm_lead.apply()
 
         # -------------------------------------------------
         # Healthcare Practitioner fields/customizations
@@ -69,75 +74,69 @@ def setup_all():
         practitioner.apply()
 
         # -------------------------------------------------
+        # Patient Appointment fields/customizations
+        # -------------------------------------------------
+        logger.info("Applying Patient Appointment setup")
+        patient_appointment.apply()
+
+        # -------------------------------------------------
         # Patient Encounter fields/customizations
         # -------------------------------------------------
         logger.info("Applying Patient Encounter setup")
         encounter.apply()
 
         # -------------------------------------------------
-        # CRM Lead fields/customizations
-        # -------------------------------------------------
-        logger.info("Applying crm lead setup")
-        crm_lead.apply()
-
-        # -------------------------------------------------
-        # Patient Appointment fields/customizations
-        # -------------------------------------------------
-        # logger.info("Applying patient appointment setup")
-        # patient_appointment.apply()
-
-        # -------------------------------------------------
         # Drug Prescription fields/customizations
         # -------------------------------------------------
-        logger.info("Applying drug prescription setup")
+        logger.info("Applying Drug Prescription setup")
         drug_prescription.apply()
-
-        # -------------------------------------------------
-        # Item Price fields/customizations
-        # -------------------------------------------------
-        logger.info("Applying item price setup")
-        item_price.apply()
 
         # -------------------------------------------------
         # Item Package fields/customizations
         # -------------------------------------------------
-        logger.info("Applying item setup")
+        logger.info("Applying Item setup")
         item.apply()
+
+        # -------------------------------------------------
+        # Item Price fields/customizations
+        # -------------------------------------------------
+        logger.info("Applying Item Price setup")
+        item_price.apply()
 
         # -------------------------------------------------
         # Sales Invoice fields/customizations
         # -------------------------------------------------
-        logger.info("Applying sales invoice setup")
+        logger.info("Applying Sales Invoice setup")
         sales_invoice.apply()
 
         # -------------------------------------------------
         # Payment Entry fields/customizations
         # -------------------------------------------------
-        logger.info("Applying payment entry setup")
+        logger.info("Applying Payment Entry setup")
         payment_entry.apply()
 
         # -------------------------------------------------
         # Purchase Order fields/customizations
         # -------------------------------------------------
-        logger.info("Applying purchase order setup")
+        logger.info("Applying Purchase Order setup")
         purchase_order.apply()
 
         # -------------------------------------------------
         # User fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying user setup")
+        # logger.info("Applying User setup")
         # user.apply()
 
         # -------------------------------------------------
         # Company fields/customizations
         # -------------------------------------------------
-        logger.info("Applying company setup")
+        logger.info("Applying Company setup")
         company.apply()
 
         # -------------------------------------------------
         # Print Format fields/customizations
         # -------------------------------------------------
-        logger.info("Applying print formats setup")
+        logger.info("Applying Print Format setup")
         print_formats.apply()
 
         # -------------------------------------------------

@@ -3,9 +3,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def set_patient_creator(doc, method=None):
+def set_appointment_creator(doc, method=None):
     """
-    Automatically set the user who created the Patient.
+    Automatically set the user who created the Appointment.
     Triggered on before_insert.
     """
 
@@ -18,10 +18,10 @@ def set_patient_creator(doc, method=None):
         if getattr(doc, "created_by_agent", None):
             return
 
-        # Set creator from session user
+        # Set creator
         doc.created_by_agent = frappe.session.user or "Administrator"
-    
+
     except Exception:
         logger.exception(
-            "Failed to set created_by_agent for Patient: %s", doc.name
+            "Failed to set created_by_agent for Patient Appointment: %s", doc.name
         )

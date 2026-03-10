@@ -94,10 +94,12 @@ def collapse_section(dt: str, fieldname: str, collapse: bool = True):
         return
     upsert_property_setter(dt, fieldname, "collapsible", "1" if collapse else "0", "Check")
 
+
 def set_label(dt: str, fieldname: str, new_label: str):
     if not frappe.get_meta(dt).get_field(fieldname):
         return
     upsert_property_setter(dt, fieldname, "label", new_label, "Data")
+
 
 def ensure_field_before(doctype: str, fieldname: str, before: str):
     meta = frappe.get_meta(doctype)
@@ -112,6 +114,7 @@ def ensure_field_before(doctype: str, fieldname: str, before: str):
     upsert_property_setter(doctype, None, "field_order", json.dumps(fields), "Text")
     frappe.clear_cache(doctype=doctype)
 
+
 def ensure_field_after(doctype: str, fieldname: str, after: str):
     meta = frappe.get_meta(doctype)
     fields = [df.fieldname for df in meta.fields]
@@ -125,9 +128,11 @@ def ensure_field_after(doctype: str, fieldname: str, after: str):
     upsert_property_setter(doctype, None, "field_order", json.dumps(fields), "Text")
     frappe.clear_cache(doctype=doctype)
 
+
 def set_full_field_order(doctype: str, ordered_fieldnames: list[str]):
     upsert_property_setter(doctype, None, "field_order", json.dumps(ordered_fieldnames), "Text")
     frappe.clear_cache(doctype=doctype)
+
 
 def upsert_title_field(doctype: str, fieldname: str):
     """
