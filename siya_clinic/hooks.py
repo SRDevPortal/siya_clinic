@@ -102,20 +102,37 @@ doc_events = {
             "siya_clinic.api.address.customer_links.ensure_address_has_customer_link",
         ],
     },
+    "CRM Lead": {
+        "validate": [
+            "siya_clinic.api.crm_lead.guards.guard_restricted_fields",
+        ],
+        "before_save": [
+            "siya_clinic.api.crm_lead.controller.normalize_phoneish_fields",
+        ],
+        "after_save": [
+            "siya_clinic.api.crm_lead.access.restore_lead_owner_after_unassign",
+        ],
+        "after_insert": [
+            "siya_clinic.api.crm_lead.lifecycle.after_insert",
+        ],
+        "on_update": [
+            "siya_clinic.api.crm_lead.lifecycle.on_update",
+        ],
+    },
     "Healthcare Practitioner": {
         "before_validate": [
             "siya_clinic.api.practitioner.name.compose_full_name",
         ],
     },
-    # "Patient Appointment": {
-    #     "before_insert": [
-    #         "siya_clinic.api.patient_appointment.set_created_by_agent",
-    #     ],
-    #     # "on_update": [
-    #     #     "siya_clinic.api.patient_appointment.create_payment_entries_from_child_table",
-    #     #     "siya_clinic.api.patient_appointment.on_update_create_payments",
-    #     # ],
-    # },
+    "Patient Appointment": {
+        "before_insert": [
+            "siya_clinic.api.patient_appointment.creator.set_appointment_creator",
+        ],
+        # "on_update": [
+        #     "siya_clinic.api.patient_appointment.create_payment_entries_from_child_table",
+        #     "siya_clinic.api.patient_appointment.on_update_create_payments",
+        # ],
+    },
     "Patient Encounter": {
         "validate": [
             "siya_clinic.api.encounter.handlers.validate_agent_status_change",
@@ -166,23 +183,6 @@ doc_events = {
             "siya_clinic.api.payment_entry.creator.set_created_by_agent",
         ],
     },
-    "CRM Lead": {
-        "validate": [
-            "siya_clinic.api.crm_lead.guards.guard_restricted_fields",
-        ],
-        "before_save": [
-            "siya_clinic.api.crm_lead.controller.normalize_phoneish_fields",
-        ],
-        "after_save": [
-            "siya_clinic.api.crm_lead.access.restore_lead_owner_after_unassign",
-        ],
-        "after_insert": [
-            "siya_clinic.api.crm_lead.lifecycle.after_insert",
-        ],
-        "on_update": [
-            "siya_clinic.api.crm_lead.lifecycle.on_update",
-        ],
-    },
     "ToDo": {
         "on_trash": [
             "siya_clinic.api.crm_lead.assign_guard.todo_on_trash",
@@ -207,6 +207,12 @@ doctype_js = {
         "public/js/patient/pex_launcher.js",
         "public/js/common/clinical_history.js",
     ],
+    "CRM Lead": [
+        "public/js/crm_lead/form/master_filters.js",
+        "public/js/crm_lead/form/disposition_filter.js",
+        "public/js/crm_lead/form/lock_fields.js",
+        "public/js/crm_lead/form/pex_launcher.js",
+    ],
     "Healthcare Practitioner": [
         "public/js/practitioner/form.js",
     ],
@@ -221,12 +227,6 @@ doctype_js = {
         # "public/js/encounter_block_autosave_for_proof.js",
         # "public/js/encounter_attachments.js",
         "public/js/common/clinical_history.js",
-    ],
-    "CRM Lead": [
-        "public/js/crm_lead/form/master_filters.js",
-        "public/js/crm_lead/form/disposition_filter.js",
-        "public/js/crm_lead/form/lock_fields.js",
-        "public/js/crm_lead/form/pex_launcher.js",
     ],
     "Item": [
         "public/js/item/package_weight.js",
