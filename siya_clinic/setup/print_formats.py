@@ -49,24 +49,11 @@ def apply():
     logger.info("Applying Siya Clinic print formats")
 
     # Patient Encounter
-    # _upsert_pf(
-    #     "Patient Encounter New",
-    #     "Patient Encounter",
-    #     "print_formats/patient_encounter_new.html",
-    # )
-
-    # Sales Invoice
-    # _upsert_pf(
-    #     "Sales Invoice New",
-    #     "Sales Invoice",
-    #     "print_formats/sales_invoice_new.html",
-    # )
-
-    # _upsert_pf(
-    #     "Sales Invoice New2",
-    #     "Sales Invoice",
-    #     "print_formats/sales_invoice_new2.html",
-    # )
+    _upsert_pf(
+        "Patient Encounter New",
+        "Patient Encounter",
+        "print_formats/patient_encounter_new.html",
+    )
 
     # Purchase Order
     _upsert_pf(
