@@ -113,8 +113,6 @@ def apply():
     _seed_company_warehouses_data()
 
     _seed_roles()
-    
-    # create_bulk_payment_upload()
 
     frappe.clear_cache()
     frappe.db.commit()
@@ -2931,65 +2929,3 @@ def _ensure_role_profile(profile_name: str, roles: list[str]):
 
     except frappe.DuplicateEntryError:
         frappe.db.rollback()
-
-
-# def create_bulk_payment_upload():
-#     """
-#     Create Bulk Payment Upload DocType (idempotent).
-#     """
-
-#     doctype_name = "Bulk Payment Upload"
-
-#     if frappe.db.exists("DocType", doctype_name):
-#         return
-
-#     doc = frappe.get_doc({
-#         "doctype": "DocType",
-#         "name": doctype_name,
-#         "module": MODULE_DEF_NAME,
-#         "custom": 1,
-#         "autoname": "hash",
-#         "track_changes": 1,
-#         "fields": [
-#             {
-#                 "label": "CSV File",
-#                 "fieldname": "csv_file",
-#                 "fieldtype": "Attach",
-#                 "reqd": 1
-#             },
-#             {
-#                 "label": "Run Actual (create entries)",
-#                 "fieldname": "run_actual",
-#                 "fieldtype": "Check",
-#                 "default": "0"
-#             },
-#             {
-#                 "label": "Process File",
-#                 "fieldname": "process_button",
-#                 "fieldtype": "Button"
-#             },
-#             {
-#                 "label": "Result / Status",
-#                 "fieldname": "status_html",
-#                 "fieldtype": "HTML"
-#             },
-#             {
-#                 "label": "Log File",
-#                 "fieldname": "log_file",
-#                 "fieldtype": "Attach",
-#                 "read_only": 1
-#             },
-#             {
-#                 "label": "Last Run",
-#                 "fieldname": "last_run",
-#                 "fieldtype": "Datetime"
-#             }
-#         ],
-#         "permissions": [
-#             {"role": "System Manager", "read": 1, "write": 1, "create": 1},
-#             {"role": "Accounts Manager", "read": 1, "write": 1, "create": 1},
-#         ]
-#     })
-
-#     doc.insert(ignore_permissions=True)
-#     frappe.db.commit()
