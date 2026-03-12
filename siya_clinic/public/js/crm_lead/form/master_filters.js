@@ -3,42 +3,69 @@
 // ======================================================
 
 frappe.ui.form.on('CRM Lead', {
-
-  onload(frm) {
-    apply_active_master_filters(frm);
-  },
-
-  refresh(frm) {
+  setup(frm) {
     apply_active_master_filters(frm);
   }
-
 });
+
+
+// ------------------------------------------------------
+// Helper for link queries with page_length
+// ------------------------------------------------------
+function link_query(filters = {}, order_by = "name asc") {
+  return {
+    filters: filters,
+    page_length: 100,
+    order_by: order_by
+  };
+}
+
 
 // ------------------------------------------------------
 // Apply active-only filters
 // ------------------------------------------------------
 function apply_active_master_filters(frm) {
 
-  // 🔹 Pipeline → active only
-  frm.set_query('sr_lead_pipeline', () => ({
-    filters: { is_active: 1 }
-  }));
+  const active = { is_active: 1 };
 
-  // 🔹 Platform → active only
-  frm.set_query('sr_lead_platform', () => ({
-    filters: { is_active: 1 }
-  }));
-
-  // 🔹 Source → active only (SR Lead Source)
-  frm.set_query('source', () => ({
-    filters: { is_active: 1 }
-  }));
-
-  // 🔹 Disposition → active + status filter
-  frm.set_query('sr_lead_disposition', () => ({
+  // Pipeline
+  frm.set_query("sr_lead_pipeline", () => ({
+    query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
-      sr_lead_status: frm.doc.status || '',
-      is_active: 1
-    }
+      field: "sr_pipeline_name",
+      order: "asc"
+    },
+    page_length: 100
   }));
+
+  // Platform
+  frm.set_query("sr_lead_platform", () => ({
+    query: "siya_clinic.api.common.link_queries.master_query",
+    filters: {
+      field: "sr_platform_name",
+      order: "asc"
+    },
+    page_length: 100
+  }));
+
+  // Source
+  frm.set_query("source", () => ({
+    query: "siya_clinic.api.common.link_queries.master_query",
+    filters: {
+      field: "sr_source_name",
+      order: "asc"
+    },
+    page_length: 100
+  }));
+
+  // Disease
+  frm.set_query("sr_lead_disease", () => ({
+    query: "siya_clinic.api.common.link_queries.master_query",
+    filters: {
+      field: "dept_disease_name",
+      order: "asc"
+    },
+    page_length: 100
+  }));
+
 }
