@@ -734,9 +734,9 @@ def create_dpt_disease_doctype():
             "autoname": "naming_series:",
             "allow_rename": 0,
             "title_field": "dept_disease_name",
-            "show_title_field_in_link": 1,
             "search_fields": "dept_disease_name",
             "show_name_in_global_search": 1,
+            "show_title_field_in_link": 1,
             "track_changes": 1,
             "fields": [
 
@@ -745,8 +745,8 @@ def create_dpt_disease_doctype():
                     "fieldname": "naming_series",
                     "label": "Series",
                     "fieldtype": "Select",
-                    "options": "REG-DIS-.#####",
-                    "default": "REG-DIS-.#####",
+                    "options": "DIS-.#####",
+                    "default": "DIS-.#####",
                     "reqd": 1,
                     "hidden": 1
                 },
@@ -899,9 +899,9 @@ def create_dpt_language_doctype():
             "autoname": "naming_series:",
             "allow_rename": 0,
             "title_field": "dept_language_name",
-            "show_title_field_in_link": 1,
             "search_fields": "dept_language_name",
             "show_name_in_global_search": 1,
+            "show_title_field_in_link": 1,
             "track_changes": 1,
             "fields": [
 
@@ -910,8 +910,8 @@ def create_dpt_language_doctype():
                     "fieldname": "naming_series",
                     "label": "Series",
                     "fieldtype": "Select",
-                    "options": "REG-LAN-.#####",
-                    "default": "REG-LAN-.#####",
+                    "options": "LAN-.#####",
+                    "default": "LAN-.#####",
                     "reqd": 1,
                     "hidden": 1
                 },
