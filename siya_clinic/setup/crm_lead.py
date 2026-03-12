@@ -93,7 +93,10 @@ def _make_crm_lead_fields():
             {
                 "fieldname": "sr_lead_disease",
                 "label": "Disease",
-                "fieldtype": "Data",
+                "fieldtype": "Link",
+                "options": "DPT Disease",
+                "in_list_view": 1,
+                "in_standard_filter": 1,
                 "insert_after": "sr_lead_notes",
             },
 
