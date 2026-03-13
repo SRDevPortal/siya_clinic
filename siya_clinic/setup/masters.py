@@ -832,6 +832,7 @@ def _seed_dpt_diseases_data():
         "Acne",
         "Hair Loss / Alopecia",
         "Dandruff",
+        "Vitiligo",
 
         # Joint & Musculoskeletal Disorders
         "Arthritis",
@@ -852,6 +853,7 @@ def _seed_dpt_diseases_data():
         "Premature Ejaculation",
         "Low Libido",
         "Male Infertility",
+        "Low Sperm Quality",
 
         # Female Health
         "Female Infertility",
@@ -866,6 +868,7 @@ def _seed_dpt_diseases_data():
         "Arrhythmia",
 
         # General / Misc
+        "General Consultation",
         "General Weakness",
         "Chronic Fatigue",
         "Vitamin Deficiency",
