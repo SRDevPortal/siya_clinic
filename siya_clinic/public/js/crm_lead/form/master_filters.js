@@ -10,18 +10,6 @@ frappe.ui.form.on('CRM Lead', {
 
 
 // ------------------------------------------------------
-// Helper for link queries with page_length
-// ------------------------------------------------------
-function link_query(filters = {}, order_by = "name asc") {
-  return {
-    filters: filters,
-    page_length: 100,
-    order_by: order_by
-  };
-}
-
-
-// ------------------------------------------------------
 // Apply active-only filters
 // ------------------------------------------------------
 function apply_active_master_filters(frm) {
@@ -32,6 +20,7 @@ function apply_active_master_filters(frm) {
   frm.set_query("sr_lead_pipeline", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
+      ...active,
       field: "sr_pipeline_name",
       order: "asc"
     },
@@ -42,6 +31,7 @@ function apply_active_master_filters(frm) {
   frm.set_query("sr_lead_platform", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
+      ...active,
       field: "sr_platform_name",
       order: "asc"
     },
@@ -52,6 +42,7 @@ function apply_active_master_filters(frm) {
   frm.set_query("source", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
+      ...active,
       field: "sr_source_name",
       order: "asc"
     },
@@ -62,6 +53,7 @@ function apply_active_master_filters(frm) {
   frm.set_query("sr_lead_disease", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
+      ...active,
       field: "dept_disease_name",
       order: "asc"
     },
