@@ -40,8 +40,11 @@ function apply_lead_disposition_rules(frm) {
   }
 
   // Apply dropdown filter
-  frm.set_query('sr_lead_disposition', () => ({
+  frm.set_query("sr_lead_disposition", () => ({
+    query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
+      field: "sr_disposition_name",
+      order: "asc",
       sr_lead_status: status,
       is_active: 1
     },
