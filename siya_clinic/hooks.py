@@ -68,6 +68,10 @@ doc_events = {
             # Link Patient → Customer
             "siya_clinic.api.address.link_to_patient.link_to_customer",
         ],
+        "on_update": [
+            # Mark customer as patient created
+            "siya_clinic.api.patient.customer_sync.mark_customer_patient_created",
+        ],
     },
     "Customer": {
         # "autoname": [
