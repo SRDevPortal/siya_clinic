@@ -151,19 +151,12 @@ function handle_encounter_place_access(frm) {
 }
 
 
-// ==========================================================
-// Encounter Source Requirement (Agent Only)
-// ==========================================================
 function handle_encounter_source_requirement(frm) {
-    const roles = frappe.user_roles || [];
-    const is_agent = roles.includes('Agent');
 
-    const is_required =
-        is_agent &&
-        ['Followup', 'Order'].includes(frm.doc.sr_encounter_type) &&
-        frm.doc.sr_encounter_place === 'Online';
+    const is_required = frm.doc.sr_encounter_place === "Online";
 
-    frm.toggle_reqd('sr_encounter_source', is_required);
+    frm.toggle_reqd("sr_encounter_source", is_required);
+
 }
 
 
