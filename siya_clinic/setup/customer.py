@@ -51,6 +51,17 @@ def _make_customer_fields():
                 "insert_after": "sr_customer_id",
                 "read_only": 1,
                 "in_list_view": 1,
+            },
+            {
+                "fieldname": "is_patient_created",
+                "label": "Patient Created",
+                "fieldtype": "Check",
+                "insert_after": "created_by_agent",
+                "default": "0",
+                "read_only": 1,
+                "in_list_view": 0,
+                "search_index": 1,
+                "description": "Indicates whether Patient record has been created for this Customer",
             }
         ]
     })
