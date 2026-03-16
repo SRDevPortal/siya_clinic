@@ -1,27 +1,32 @@
 import frappe
 
 
-def run(limit=200, start=0):
+def run(limit=200):
 
-    print(f"\nStarting Customer → Patient migration | start={start} limit={limit}\n")
+    print(f"\nStarting Customer → Patient migration | limit={limit}\n")
 
     frappe.flags.in_import = True
     frappe.flags.in_shopify_api = True
 
     customers = frappe.get_all(
         "Customer",
+        filters={"is_patient_created": 0},
         fields=["name", "customer_name"],
-        start=start,
         page_length=limit
     )
 
     if not customers:
-        print("No customers found for this batch.")
+        print("No customers left to migrate.")
         return
 
     for c in customers:
 
-        patient_name = frappe.db.get_value("Patient", {"customer": c.name}, "name")
+        # ---------------- CHECK EXISTING PATIENT ----------------
+        patient_name = frappe.db.get_value(
+            "Patient",
+            {"customer": c.name},
+            "name"
+        )
 
         # ---------------- GET CONTACT ----------------
         mobile = None
@@ -45,14 +50,19 @@ def run(limit=200, start=0):
             print("Skipping", c.name, "(no mobile in Contact)")
             continue
 
-         # ---------------- CREATE PATIENT ----------------
+        # ---------------- CREATE PATIENT ----------------
         if not patient_name:
 
-            first = (c.customer_name or "").split(" ")[0] or "Unknown"
+            name_parts = (c.customer_name or "").split()
+
+            first = name_parts[0] if name_parts else "Unknown"
+            last = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
 
             patient = frappe.new_doc("Patient")
+
             patient.patient_name = c.customer_name
             patient.first_name = first
+            patient.last_name = last
             patient.customer = c.name
             patient.mobile = mobile
             patient.email = email
@@ -64,6 +74,9 @@ def run(limit=200, start=0):
             patient_name = patient.name
 
             print("Created Patient:", patient_name)
+
+        else:
+            print("Patient already exists:", patient_name)
 
         # ---------------- LINK CONTACT ----------------
         contacts = frappe.get_all(
@@ -118,6 +131,15 @@ def run(limit=200, start=0):
                 })
 
                 addr_doc.save(ignore_permissions=True)
+
+        # ---------------- MARK CUSTOMER PROCESSED ----------------
+        frappe.db.set_value(
+            "Customer",
+            c.name,
+            "is_patient_created",
+            1,
+            update_modified=False
+        )
 
     frappe.db.commit()
 
