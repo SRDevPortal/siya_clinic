@@ -135,54 +135,80 @@ def _ensure_customer(customer_name: str, company: str) -> str:
 def _resolve_encounter_warehouse(doc) -> str:
     """
     Decide warehouse based on Encounter Place + User Role + Company.
-    Works safely for multi-company setups.
     """
+
     place = (doc.get("sr_encounter_place") or "").strip().lower()
     company = doc.company
-    user = frappe.session.user
-    roles = frappe.get_roles(user)
 
+    # Get user roles
+    roles = frappe.get_roles(frappe.session.user)
+    roles_lower = {r.lower() for r in roles}
+
+    # --------------------------------------
+    # Role check helper
+    # --------------------------------------
+    def has_any_role(allowed):
+        return any(r.lower() in roles_lower for r in allowed)
+
+    # --------------------------------------
+    # Get warehouse by keyword
+    # --------------------------------------
     def get_company_warehouse(keyword):
-        """Find warehouse by keyword for this company."""
-        wh = frappe.db.get_value(
+        return frappe.db.get_value(
             "Warehouse",
-            {"company": company, "warehouse_name": ["like", f"%{keyword}%"]},
-            "name"
-        )
-        return wh
+            {
+                "company": company,
+                "warehouse_name": ["like", f"%{keyword}%"],
+                "disabled": 0,
+            },
+            "name",
+        )   
 
-    # ---------------- Admin / System Manager ----------------
-    if "Administrator" in roles or "System Manager" in roles:
-        if place == "opd":
-            wh = get_company_warehouse("OPD")
-        else:
-            wh = get_company_warehouse("Packaging")
-
-        if not wh:
-            frappe.throw(f"No warehouse found for {company} ({place})")
-        return wh
-
-    # ---------------- OPD Encounter ----------------
+    # --------------------------------------
+    # Warehouse resolution
+    # --------------------------------------
     if place == "opd":
-        if "OPD Biller" not in roles:
+
+        allowed_roles = ["OPD Biller", "Biller", "System Manager", "Administrator"]
+
+        if not has_any_role(allowed_roles):
             frappe.throw("You are not allowed to submit OPD Encounters.")
 
         wh = get_company_warehouse("OPD")
-        if not wh:
-            frappe.throw(f"No OPD warehouse found for company {company}")
-        return wh
 
-    # ---------------- Online Encounter ----------------
-    if place == "online":
-        if "Packaging Biller" not in roles:
+    elif place == "online":
+
+        allowed_roles = ["Packaging Biller", "Biller", "System Manager", "Administrator"]
+
+        if not has_any_role(allowed_roles):
             frappe.throw("You are not allowed to submit Online Encounters.")
 
         wh = get_company_warehouse("Packaging")
-        if not wh:
-            frappe.throw(f"No Packaging warehouse found for company {company}")
-        return wh
 
-    frappe.throw("Invalid Encounter Place. Warehouse cannot be resolved.")
+    else:
+        frappe.throw("Invalid Encounter Place. Warehouse cannot be resolved.")
+
+    # --------------------------------------
+    # Fallback to Main Warehouse
+    # --------------------------------------
+    if not wh:
+        wh = frappe.db.get_value(
+            "Warehouse",
+            {
+                "company": company,
+                "warehouse_name": ["like", "%Ware House%"],
+                "disabled": 0,
+            },
+            "name"
+        )
+
+    # --------------------------------------
+    # Final validation
+    # --------------------------------------
+    if not wh:
+        frappe.throw(f"No warehouse configured for company {company}")
+
+    return wh
 
 
 def _sanitize_si_warehouses(si, company: str) -> None:
@@ -359,7 +385,7 @@ def _create_draft_payment_entry(
     if hasattr(pe, "intended_sales_invoice"):
         pe.intended_sales_invoice = intended_si_name
     
-    # --- NEW: map Encounter custom fields onto Payment Entry IF those fields exist ---
+    # map Encounter custom fields onto Payment Entry IF those fields exist
     try:
         pe_meta = frappe.get_meta("Payment Entry")
         if order_source and pe_meta.has_field("sr_pe_order_source"):
@@ -410,29 +436,22 @@ def validate_agent_status_change(doc, method):
         frappe.throw("Agent is not allowed to change Encounter Status.")
 
 
-def validate_agent_followup_online_source(doc, method=None):
+def validate_online_encounter_source(doc, method=None):
     """
-    Ensure Encounter Source is provided for Online Follow-up / Order
-    encounters created or edited by Agents while in Draft state.
+    Ensure Encounter Source is provided when Encounter Place is Online.
+    Applies to all roles.
     """
-    roles = frappe.get_roles(frappe.session.user)
-
-    # Run only for Agent role
-    if "Agent" not in roles:
-        return
 
     # Apply only on Draft documents
     if doc.docstatus != 0:
         return
 
-    # Validate Online Follow-up / Order encounters
-    is_online = doc.sr_encounter_place == "Online"
-    is_followup_or_order = doc.sr_encounter_type in ("Followup", "Order")
+    is_online = (doc.sr_encounter_place or "").lower() == "online"
     has_source = bool(doc.sr_encounter_source)
 
-    if is_online and is_followup_or_order and not has_source:
+    if is_online and not has_source:
         frappe.throw(
-            "Encounter Source is mandatory for Online Follow-up or Order encounters.",
+            "Encounter Source is mandatory for Online Encounters.",
             title="Missing Required Field"
         )
 
