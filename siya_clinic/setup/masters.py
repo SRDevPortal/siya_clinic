@@ -93,6 +93,7 @@ def apply():
     create_medication_template()
 
     _seed_medication_classification_data()
+    _seed_item_group_data()
 
     create_delivery_type()
     _seed_delivery_type_data()    
@@ -2273,6 +2274,31 @@ def _seed_medication_classification_data():
             frappe.db.commit()  # Commit to save changes
 
             print(f"Medication Class '{class_name}' created.")
+
+
+def _seed_item_group_data():
+    """Create Item Group seed records if missing."""
+
+    item_groups = [
+        "Allopathic",
+        "Ayurvedic",
+        "Cosmetic",
+        "Homeopathic",
+        "Packaging Material"
+    ]
+
+    for group_name in item_groups:
+        if not frappe.db.exists("Item Group", group_name):
+            frappe.get_doc({
+                "doctype": "Item Group",
+                "item_group_name": group_name,
+                "parent_item_group": "All Item Groups",
+                "is_group": 0
+            }).insert(ignore_permissions=True)
+
+            frappe.db.commit()
+
+            print(f"Item Group '{group_name}' created.")
 
 
 def create_delivery_type():
