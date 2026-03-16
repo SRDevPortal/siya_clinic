@@ -1,6 +1,38 @@
 import frappe
 
 
+# -----------------------------------
+# STEP 1: Initialize Existing Records
+# -----------------------------------
+
+def init():
+
+    print("\nInitializing existing customer patient flags...\n")
+
+    patients = frappe.get_all("Patient", fields=["customer"])
+
+    count = 0
+
+    for p in patients:
+        if p.customer:
+            frappe.db.set_value(
+                "Customer",
+                p.customer,
+                "is_patient_created",
+                1,
+                update_modified=False
+            )
+            count += 1
+
+    frappe.db.commit()
+
+    print(f"Customers updated: {count}\n")
+
+
+# -----------------------------------
+# STEP 2: Migration
+# -----------------------------------
+
 def run(limit=200):
 
     print(f"\nStarting Customer → Patient migration | limit={limit}\n")
