@@ -136,7 +136,7 @@ doc_events = {
     "Patient Encounter": {
         "validate": [
             "siya_clinic.api.encounter.handlers.validate_agent_status_change",
-            "siya_clinic.api.encounter.handlers.validate_agent_followup_online_source",
+            "siya_clinic.api.encounter.handlers.validate_online_encounter_source",
             # "siya_clinic.api.encounter.handlers.validate_encounter_workflow",
         ],
         "before_insert": [
