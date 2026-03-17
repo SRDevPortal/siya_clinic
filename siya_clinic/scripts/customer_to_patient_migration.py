@@ -78,8 +78,8 @@ def run(limit=200):
             mobile = frappe.db.get_value("Contact", contact, "mobile_no")
             email = frappe.db.get_value("Contact", contact, "email_id")
 
-        if not mobile:
-            print("Skipping", c.name, "(no mobile in Contact)")
+        if not mobile or not str(mobile).strip():
+            print("Skipping", c.name, "(invalid or empty mobile)")
             continue
 
         # ---------------- CREATE PATIENT ----------------
@@ -96,16 +96,20 @@ def run(limit=200):
             patient.first_name = first
             patient.last_name = last
             patient.customer = c.name
-            patient.mobile = mobile
+            patient.mobile = str(mobile).strip()
             patient.email = email
             patient.sex = "Unknown"
             patient.sr_medical_department = "General"
 
-            patient.insert(ignore_permissions=True)
+            try:
+                patient.insert(ignore_permissions=True)
 
-            patient_name = patient.name
+                patient_name = patient.name
+                print("Created Patient:", patient_name)
 
-            print("Created Patient:", patient_name)
+            except Exception as e:
+                print(f"❌ Failed for {c.name} → {str(e)}")
+                continue
 
         else:
             print("Patient already exists:", patient_name)
@@ -121,9 +125,9 @@ def run(limit=200):
             pluck="parent"
         )
 
-        for contact in contacts:
+        for contact_name in contacts:
 
-            contact_doc = frappe.get_doc("Contact", contact)
+            contact_doc = frappe.get_doc("Contact", contact_name)
 
             if not any(
                 l.link_doctype == "Patient" and l.link_name == patient_name
