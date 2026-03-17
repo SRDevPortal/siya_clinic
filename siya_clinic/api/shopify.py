@@ -352,8 +352,11 @@ def _get_or_create_customer(payload):
         "territory": payload.get("territory") or "All Territories",
         "email_id": email,
         "mobile_no": phone
-    }).insert(ignore_permissions=True)
-    return doc.name
+    })
+    
+    doc.insert(ignore_permissions=True)
+
+    return doc.name   # always return ID, not name
 
 
 # ------------------------------
