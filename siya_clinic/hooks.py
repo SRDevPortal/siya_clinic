@@ -47,15 +47,17 @@ doc_events = {
             "siya_clinic.api.patient.naming.set_patient_series",
         ],
         "before_insert": [
-            "siya_clinic.api.patient.patient_id.set_patient_id",
             "siya_clinic.api.patient.creator.set_patient_creator",
             "siya_clinic.api.patient.user_control.disable_invite_user",
-            "siya_clinic.api.patient.followup_marker.set_followup_id",
-            "siya_clinic.api.patient.followup_marker.set_followup_day",
-            "siya_clinic.api.patient.followup_marker.set_default_followup_status",
             # Normalize early
             "siya_clinic.api.patient.integrity.normalize_patient_contact_numbers",
             "siya_clinic.api.patient.integrity.normalize_patient_email",
+        ],
+        "before_save": [
+            "siya_clinic.api.patient.patient_id.set_patient_id",
+            "siya_clinic.api.patient.followup_marker.set_followup_id",
+            "siya_clinic.api.patient.followup_marker.set_followup_day",
+            "siya_clinic.api.patient.followup_marker.set_default_followup_status",
         ],
         "validate": [
             # Normalize again (safe)
