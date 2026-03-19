@@ -75,34 +75,74 @@ def _make_invoice_fields():
                 "fetch_from": "patient.sr_medical_department",
                 "insert_after": "sr_si_patient_id",
             },
+            {
+                "fieldname": "created_by_agent",
+                "label": "Created By",
+                "fieldtype": "Link",
+                "options": "User",
+                "read_only": 1,
+                "insert_after": "due_date",
+            },
 
             # -------------------------------------------------
-            # Tracking Section
+            # External Order Tracking (Shopify / Buopso)
+            # -------------------------------------------------
+            {
+                "fieldname": "order_source",
+                "label": "Order Source",
+                "fieldtype": "Link",
+                "options": lead_source_dt,
+                "in_list_view": 1,
+                "in_standard_filter": 1,
+                "insert_after": "created_by_agent",
+            },
+            {
+                "fieldname": "shopify_order_id",
+                "label": "Shopify Order ID",
+                "fieldtype": "Data",
+                "in_list_view": 1,
+                "in_standard_filter": 1,
+                "insert_after": "order_source",
+            },
+            {
+                "fieldname": "shopify_order_number",
+                "label": "Shopify Order Number",
+                "fieldtype": "Data",
+                "in_list_view": 1,
+                "in_standard_filter": 1,
+                "in_global_search": 1,
+                "insert_after": "shopify_order_id",
+            },
+            {
+                "fieldname": "buopso_order_id",
+                "label": "Buopso Order ID",
+                "fieldtype": "Data",
+                "in_list_view": 1,
+                "in_standard_filter": 1,
+                "in_global_search": 1,
+                "insert_after": "shopify_order_number",
+            },
+
+
+            # -------------------------------------------------
+            # Encounter Tracking Section
             # -------------------------------------------------
             {
                 "fieldname": "sr_si_track_sb",
                 "label": "Order Tracking Details",
                 "fieldtype": "Section Break",
                 "collapsible": 1,
-                "insert_after": "gst_breakup_table",
+                "insert_after": "timesheets",
             },
-
-            # -------------------------------------------------
-            # Order Source
-            # -------------------------------------------------
             {
                 "fieldname": "sr_si_order_source",
-                "label": "Order Source",
+                "label": "Encounter Source",
                 "fieldtype": "Link",
                 "options": lead_source_dt,
                 "in_list_view": 1,
                 "in_standard_filter": 1,
                 "insert_after": "sr_si_track_sb",
             },
-
-            # -------------------------------------------------
-            # Encounter Place
-            # -------------------------------------------------
             {
                 "fieldname": "sr_si_encounter_place",
                 "label": "Encounter Place",
@@ -112,10 +152,6 @@ def _make_invoice_fields():
                 "in_standard_filter": 1,
                 "insert_after": "sr_si_order_source",
             },
-
-            # -------------------------------------------------
-            # Sales Type
-            # -------------------------------------------------
             {
                 "fieldname": "sr_si_sales_type",
                 "label": "Sales Type",
@@ -125,10 +161,6 @@ def _make_invoice_fields():
                 "in_standard_filter": 1,
                 "insert_after": "sr_si_encounter_place",
             },
-
-            # -------------------------------------------------
-            # Delivery Type
-            # -------------------------------------------------
             {
                 "fieldname": "sr_si_delivery_type",
                 "label": "Delivery Type",
@@ -152,18 +184,6 @@ def _make_invoice_fields():
                 "hidden": 1,
                 "print_hide": 1,
                 "insert_after": "sr_si_delivery_type",
-            },
-
-            # -------------------------------------------------
-            # Audit Field
-            # -------------------------------------------------
-            {
-                "fieldname": "created_by_agent",
-                "label": "Created By",
-                "fieldtype": "Link",
-                "options": "User",
-                "read_only": 1,
-                "insert_after": "due_date",
             },
         ]
     })
@@ -251,6 +271,13 @@ def _apply_invoice_ui_customizations():
     
     # Set title field to patient_name
     upsert_title_field(PARENT, "patient_name")
+
+    ensure_field_after(PARENT, "sr_si_track_sb", "timesheets")
+    ensure_field_after(PARENT, "sr_si_order_source", "sr_si_track_sb")
+    ensure_field_after(PARENT, "sr_si_encounter_place", "sr_si_order_source")
+    ensure_field_after(PARENT, "sr_si_sales_type", "sr_si_encounter_place")
+    ensure_field_after(PARENT, "sr_si_delivery_type", "sr_si_sales_type")
+    ensure_field_after(PARENT, "sent_to_shipkia", "sr_si_delivery_type")
 
     # -------------------------------------------------
     # ⭐ NEW: Show Patient Name as List Title
