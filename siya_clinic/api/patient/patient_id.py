@@ -5,26 +5,35 @@ import frappe
 def set_patient_id(doc, method=None):
     """
     Sync sr_patient_id with naming series (name)
-
     Example:
-    name            = EEPL-PAT-12452
-    sr_patient_id   = EEPL12452
+    EEPL-PAT-12452 → EEPL12452
     """
 
+    # DO NOT overwrite if already set
+    if doc.get("sr_patient_id"):
+        return
+    
     # Ensure name exists
-    if not doc.name:
+    if not doc.name or "-" not in doc.name:
         return
 
     # Extract number from name
-    if "-" in doc.name:
+    try:
         number = doc.name.split("-")[-1]
+
+        # 🔥 Ensure valid number
+        if not number.isdigit():
+            return
 
         # Get company abbr
         company = frappe.defaults.get_global_default("company")
         abbr = frappe.db.get_value("Company", company, "abbr")
 
         # Set sr_patient_id
-        doc.sr_patient_id = f"{abbr}{number}"
+        doc.sr_patient_id = f"{abbr}{int(number)}"  # removes leading zeros
+
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Patient ID Error")
 
 
 # import frappe
