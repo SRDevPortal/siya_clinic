@@ -494,6 +494,11 @@ def _seed_lead_sources_data():
         "Shopify",
         "Whatsapp Meta",
         "Youtube",
+        "Twitter",
+        "Amazon",
+        "Flipkart",
+        "Direct",
+        "Other",
     ]
 
     for source in sources:
