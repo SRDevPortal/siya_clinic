@@ -40,6 +40,15 @@ def _name_parts(full):
     return first, last
 
 
+def _lead_source_doctype():
+    """Return available Lead Source DocType in priority order."""
+    if frappe.db.exists("DocType", "SR Lead Source"):
+        return "SR Lead Source"
+    if frappe.db.exists("DocType", "CRM Lead Source"):
+        return "CRM Lead Source"
+    return "Lead Source"
+
+
 def _resolve_company(val):
     # 1) If nothing passed, use default or the only company
     if not val:
@@ -171,9 +180,6 @@ def _get_receivable_account(company):
     )
 
 
-# -------------------------------------------------
-# Item Group Template Helpers
-# -------------------------------------------------
 def _get_item_group_template_from_item(item_code):
     """
     Match Shopify item_code with Item Group Template.template_name
@@ -316,7 +322,6 @@ def _ensure_item(it, company):
     return doc.name
 
 
-# ---------- Curren# ---------- Currency helpers ----------
 def _safe_rate(from_curr, to_curr, posting_date):
     if not from_curr or not to_curr or from_curr == to_curr:
         return 1
@@ -326,9 +331,7 @@ def _safe_rate(from_curr, to_curr, posting_date):
         return 1
 
 
-# ------------------------------
 # Customer
-# ------------------------------
 def _get_or_create_customer(payload):
     name = None
     email = payload.get("customer_email")
@@ -348,6 +351,7 @@ def _get_or_create_customer(payload):
     doc = frappe.get_doc({
         "doctype": "Customer",
         "customer_name": cust_name or (email or phone),
+        "customer_type": "Individual",
         "customer_group": payload.get("customer_group") or "All Customer Groups",
         "territory": payload.get("territory") or "All Territories",
         "email_id": email,
@@ -359,12 +363,7 @@ def _get_or_create_customer(payload):
     return doc.name   # always return ID, not name
 
 
-# ------------------------------
-# Patient  (patient=customer fallback supported)
-# ------------------------------
-# ------------------------------
-# Patient  (patient=customer fallback supported)
-# ------------------------------
+# Patient (patient=customer fallback supported)
 def _get_or_create_patient(payload, customer):
     """Create/reuse Patient. If patient_* not provided (or patient_same_as_customer=1),
     auto-fill from customer_* and populate first/last name when available."""
@@ -482,9 +481,7 @@ def _get_or_create_patient(payload, customer):
     return pdoc.name
 
 
-# ------------------------------
 # Address & Contact (Dynamic Links to both)
-# ------------------------------
 def _make_dynamic_links(link_doctypes):
     return [{"link_doctype": d["link_doctype"], "link_name": d["link_name"]}
             for d in link_doctypes if d.get("link_name")]
@@ -580,9 +577,7 @@ def _create_or_update_contact(payload, customer, patient):
     return cd.name
 
 
-# ------------------------------
-# Core: Sales Invoice
-# ------------------------------
+# Sales Invoice
 def _create_sales_invoice(payload, customer, patient):
     company = _resolve_company(payload.get("company"))
     company_currency = frappe.db.get_value("Company", company, "default_currency") or "INR"
@@ -594,7 +589,7 @@ def _create_sales_invoice(payload, customer, patient):
     if not items:
         frappe.throw("Items missing")
 
-    # ---- Company/Customer state to decide GST template ----
+    # Company/Customer state to decide GST template
     company_state = payload.get("company_state")
     if not company_state:
         dl = frappe.get_all(
@@ -639,7 +634,7 @@ def _create_sales_invoice(payload, customer, patient):
         for t in taxes:
             t["included_in_print_rate"] = 1
 
-    # ---- Price List defaults / rates ----
+    # Price List defaults / rates
     selling_price_list, price_list_currency, plc_conversion_rate = _resolve_price_list(payload, currency)
 
     if not plc_conversion_rate:
@@ -665,7 +660,7 @@ def _create_sales_invoice(payload, customer, patient):
             except Exception:
                 conversion_rate = 1
 
-    # ---- Build Items ----
+    # Build Items
     autocreate = payload.get("autocreate_item") in (1, "1", True, "true", "True")
     has_disc_amount_field = frappe.get_meta("Sales Invoice Item").has_field("discount_amount")
 
@@ -687,9 +682,7 @@ def _create_sales_invoice(payload, customer, patient):
 
         template = _get_item_group_template_from_item(code)
 
-        # =============================
         # CASE 1: KIT / TEMPLATE ITEM
-        # =============================
         if template:
             applied_template = template
             kit_discount_applied = True
@@ -722,9 +715,7 @@ def _create_sales_invoice(payload, customer, patient):
                 })
             continue
         
-        # =============================
         # CASE 2: NORMAL ITEM
-        # =============================
         else:
             if disc_amt and not disc_pct:
                 per_unit_disc = disc_amt / qty
@@ -787,36 +778,63 @@ def _create_sales_invoice(payload, customer, patient):
     if frappe.get_meta("Sales Invoice").has_field("patient") and patient:
         si_data["patient"] = patient
 
-    # ---- write custom "Others" fields from payload (safe & optional) ----
+    # write custom "Others" fields from payload (safe & optional)
     si_meta = frappe.get_meta("Sales Invoice")
 
     def _add_custom(fieldname, value):
         if si_meta.has_field(fieldname) and value not in (None, "", []):
             si_data[fieldname] = value
 
-    # Normalize order_source to allowed options
-    _src_raw = (payload.get("order_source") or "").strip().lower()
-    _src_map = {
-        "shopify":  "Shopify",
-        "amazon":   "Amazon",
-        "flipkart": "Flipkart",
-        "direct":   "Direct",
-        "other":    "Other",
+    # Order Source (Link-safe)
+    lead_source_dt = _lead_source_doctype()
+
+    _src_val = (payload.get("order_source") or "").strip()
+    _src_val = _src_val.title() if _src_val else "Other"
+
+    # ✅ Use filters (clean + reusable)
+    filters = {
+        "sr_source_name": _src_val,
+        "is_active": 1
     }
-    _src_val = _src_map.get(_src_raw) or (payload.get("order_source") or "Other")
+
+    # Try to find by sr_source_name
+    name = frappe.db.get_value(
+        lead_source_dt,
+        filters,
+        "name"
+    )
+
+    # If not found → create it
+    if not name:
+        try:
+            doc = frappe.get_doc({
+                "doctype": lead_source_dt,
+                "sr_source_name": _src_val
+            }).insert(ignore_permissions=True)
+
+            name = doc.name
+
+        except frappe.DuplicateEntryError:
+            # retry fetch (race condition safe)
+            name = frappe.db.get_value(
+                lead_source_dt,
+                filters,
+                "name"
+            )
 
     # Shopify IDs can exceed INT limit
     def _safe_id(val):
+        if not val:
+            return None
         try:
-            n = int(val)
-            return str(n) if n > 2147483647 else n
+            return str(int(str(val).strip()))
         except Exception:
-            return val
+            return str(val).strip()
 
+    _add_custom("order_source", name)
     _add_custom("shopify_order_id", _safe_id(payload.get("shopify_order_id")))
     _add_custom("shopify_order_number", _safe_id(payload.get("shopify_order_number")))
     _add_custom("buopso_order_id", _safe_id(payload.get("buopso_order_id")))
-    _add_custom("order_source", _src_val)
 
     si = frappe.get_doc(si_data)
     si.flags.ignore_permissions = True
@@ -829,10 +847,8 @@ def _create_sales_invoice(payload, customer, patient):
 
     return si.name
 
-# ------------------------------
-# Payment Entry (optional)
-# ------------------------------
 
+# Payment Entry (optional)
 def _create_payment_entry(payload, customer, sales_invoice):
     paid_company_currency = float(payload.get("paid_amount") or 0)
     if paid_company_currency <= 0:
@@ -901,17 +917,17 @@ def _create_payment_entry(payload, customer, sales_invoice):
         pe.submit()
     return pe.name
 
+
 # ------------------------------
 # Public API
 # ------------------------------
-
 @frappe.whitelist(allow_guest=False, methods=["POST"])
 def create_shopify_order():
     """
     Creates/links Patient, Customer, Address, Contact -> Sales Invoice -> Payment Entry.
     """
 
-    # ✅ Tell validators this is Shopify flow
+    # Tell validators this is Shopify flow
     frappe.flags.in_shopify_api = True
 
     payload = _get_json()
