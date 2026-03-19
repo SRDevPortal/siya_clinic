@@ -7,8 +7,16 @@ from frappe.utils import getdate, nowdate
 # 1️⃣ Set Followup ID (based on last digit)
 # --------------------------------------------------------
 def set_followup_id(doc, method=None):
+    # ✅ Skip if already set
+    if doc.get("sr_followup_id"):
+        return
+
     # Use best available source
-    source = doc.get("sr_practo_id") or doc.get("sr_patient_id") or doc.name
+    source = (
+        doc.get("sr_practo_id")
+        or doc.get("sr_patient_id")
+        or doc.name
+    )
 
     if not source:
         return
@@ -20,7 +28,10 @@ def set_followup_id(doc, method=None):
     if not digits:
         return
     
-    last_digit = int(digits[-1])
+    try:
+        last_digit = int(digits[-1])
+    except:
+        return
 
     # Fetch matching Followup ID
     record = frappe.get_cached_value(
