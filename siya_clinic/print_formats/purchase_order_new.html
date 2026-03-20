@@ -58,69 +58,69 @@
 {% set overall_gst_pct = 5 %}
 
 <style>
-:root{ --sr-border:#939393; }
+  :root{ --sr-border:#939393; }
 
-/* Reuse same style system as Sales Invoice for perfect parity */
-.po-wrap{
+  /* Reuse same style system as Sales Invoice for perfect parity */
+  .po-wrap{
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 10pt;
   line-height: 1.35;
   color: #111;
-}
-.po-wrap *{ font-size: inherit !important; line-height: inherit; }
-.po-wrap h1, .po-wrap h2, .po-wrap h3, .po-wrap h4{ font-weight:600; font-size:10pt !important; margin:0 0 6pt; }
+  }
+  .po-wrap *{ font-size: inherit !important; line-height: inherit; }
+  .po-wrap h1, .po-wrap h2, .po-wrap h3, .po-wrap h4{ font-weight:600; font-size:10pt !important; margin:0 0 6pt; }
 
-.po-head{
+  .po-head{
   width:100%;
   border:1px solid var(--sr-border);
   border-collapse: collapse;
   margin-bottom:10pt;
-}
-.po-head td{
+  }
+  .po-head td{
   padding:6pt 8pt;
   border-right:1px solid var(--sr-border);
   border-bottom:1px solid var(--sr-border);
   vertical-align: top;
-}
-.po-head tr:last-child td{ border-bottom:0; }
-.po-head td:last-child{ border-right:0; }
+  }
+  .po-head tr:last-child td{ border-bottom:0; }
+  .po-head td:last-child{ border-right:0; }
 
-.po-co-name{ font-weight:700; margin-bottom:4pt; }
-.po-left-lines{ line-height:1.45; }
+  .po-co-name{ font-weight:700; margin-bottom:4pt; }
+  .po-left-lines{ line-height:1.45; }
 
-.po-right-title{ text-align:right; font-weight:700; margin-bottom:6pt; }
-.po-meta{ width:100%; border-collapse:collapse; }
-.po-meta tr { border-bottom: 1px solid var(--sr-border); }
-.po-meta td{ padding:4pt 0; border:0; }
-.po-meta .lbl{ background: transparent; color:#444; width:30%; text-align:left; padding-right:10px; }
-.po-meta .val{ width:70%; text-align:right; }
+  .po-right-title{ text-align:right; font-weight:700; margin-bottom:6pt; }
+  .po-meta{ width:100%; border-collapse:collapse; }
+  .po-meta tr { border-bottom: 1px solid var(--sr-border); }
+  .po-meta td{ padding:4pt 0; border:0; }
+  .po-meta .lbl{ background: transparent; color:#444; width:30%; text-align:left; padding-right:10px; }
+  .po-meta .val{ width:70%; text-align:right; }
 
-/* Items and blocks */
-.card{ width:100%; border:1.25pt solid #939393; border-collapse:collapse; table-layout:fixed; margin-bottom:10pt; }
-.kv td{ padding:4pt 6pt; border-bottom:1px solid var(--sr-border); vertical-align:top; }
-.kv tr:last-child td{ border-bottom:0; }
-.tbl{ width:100%; border-collapse:collapse; }
-.tbl th,.tbl td{ border:1px solid var(--sr-border); padding:6pt 8pt; vertical-align:top; }
-.lbl{ width:120px; color:#444; background:#eeeeee; }
-.right{ text-align:right; }
-.muted{ color:#666; }
-.addr{ line-height:1.4; }
+  /* Items and blocks */
+  .card{ width:100%; border:1.25pt solid #939393; border-collapse:collapse; table-layout:fixed; margin-bottom:10pt; }
+  .kv td{ padding:4pt 6pt; border-bottom:1px solid var(--sr-border); vertical-align:top; }
+  .kv tr:last-child td{ border-bottom:0; }
+  .tbl{ width:100%; border-collapse:collapse; }
+  .tbl th,.tbl td{ border:1px solid var(--sr-border); padding:6pt 8pt; vertical-align:top; }
+  .lbl{ width:120px; color:#444; background:#eeeeee; }
+  .right{ text-align:right; }
+  .muted{ color:#666; }
+  .addr{ line-height:1.4; }
 
-/* Totals */
-.sum{ width:100%; }
-.sum td{ padding:6pt 8pt; border-bottom:1px solid #939393; font-weight:700; }
-.sum td.k{ color:#444; }
-.sum td.v{ text-align:right; white-space:nowrap; }
-.sum tr.total td{ border-top:1px solid #939393; font-weight:700; }
-.sum tr.bold td{ font-weight:700; }
+  /* Totals */
+  .sum{ width:100%; }
+  .sum td{ padding:6pt 8pt; border-bottom:1px solid #939393; font-weight:700; }
+  .sum td.k{ color:#444; }
+  .sum td.v{ text-align:right; white-space:nowrap; }
+  .sum tr.total td{ border-top:1px solid #939393; font-weight:700; }
+  .sum tr.bold td{ font-weight:700; }
 
-/* Terms */
-.blk{ margin-bottom:10pt; }
-.blk h4{ margin:0 0 6pt; text-transform:uppercase; }
-.blk .box{ border:1px solid #939393; padding:5pt 2pt; }
+  /* Terms */
+  .blk{ margin-bottom:10pt; }
+  .blk h4{ margin:0 0 6pt; text-transform:uppercase; }
+  .blk .box{ border:1px solid #939393; padding:5pt 2pt; }
 
-/* Signature */
-.sign-box{ width:auto; border:1px solid #939393; border-radius:0pt; padding:2pt; display:inline-block; }
+  /* Signature */
+  .sign-box{ width:auto; border:1px solid #939393; border-radius:0pt; padding:2pt; display:inline-block; }
 </style>
 
 <div class="po-wrap">
@@ -357,7 +357,7 @@
               <img src="{{ doc.authorised_signature }}" alt="Authorised Sign" style="max-height:48px;">
             {% else %}
               <div>
-                <img src="{{ frappe.utils.get_url('/files/sign-and-stam.jpg') }}" alt="Authorised Signatory">
+                <img src="{{ frappe.utils.get_url('/files/authorised_signature.jpg') }}" alt="Authorised Signatory">
               </div>
             {% endif %}
           </div>
