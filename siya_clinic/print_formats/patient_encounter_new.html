@@ -13,55 +13,64 @@
 {% set comp_addr = frappe.get_doc("Address", comp_addr_link[0].parent) if comp_addr_link else None %}
 
 <!-- ================= HEADER ================= -->
-<div style="border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 10px;">
+<div style="border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 0px;">
   <table style="width: 100%; font-family: Arial, sans-serif;">
     <tr>
       <td style="width: 20%; vertical-align: top;">
-        <img src="/files/company-logo.png" style="max-height: 120px;">
+        <img src="https://sriaas-frappe.s3.ap-south-1.amazonaws.com/icon-sr/sriaas-logo.png" style="max-height: 120px;">
       </td>
       <td style="width: 80%; vertical-align: top;">
-        <div style="font-size: 22px; font-weight: 600; margin-bottom: 5px;">
+        <div style="font-size: 17px; font-weight: 600; margin-bottom: 5px;">
           {{ company_doc.company_name }}
         </div>
 
         <table style="width: 100%;">
           <tr>
-            <td style="font-size: 12px; line-height: 1.6; vertical-align: top; width: 50%; padding-left: 0 !important;">
+            <td style="font-size: 12px; line-height: 1.5; vertical-align: top; width: 50%; padding-left: 0 !important;">
               {% if comp_addr %}
-                {{ comp_addr.address_line1 or "" }}<br>
-                {% if comp_addr.address_line2 %}{{ comp_addr.address_line2 }}<br>{% endif %}
-            
-                {# ---- City, State, Pincode, Country in one clean line ---- #}
-                {% set city_line = [] %}
-                {% if comp_addr.city %}{% set _ = city_line.append(comp_addr.city) %}{% endif %}
-                {% if comp_addr.state %}{% set _ = city_line.append(comp_addr.state) %}{% endif %}
-                {% if comp_addr.pincode %}{% set _ = city_line.append("PIN: " ~ comp_addr.pincode) %}{% endif %}
-                {% if comp_addr.country %}{% set _ = city_line.append(comp_addr.country) %}{% endif %}
-            
-                {{ city_line | join(", ") }}<br>
-              {% endif %}
-            
-              {% if company_doc.gstin %}
-                <strong>GST No:</strong> {{ company_doc.gstin }}<br>
+                {{ comp_addr.address_line1 }}<br>
+
+                {% if comp_addr.address_line2 %}
+                  {{ comp_addr.address_line2 }}<br>
+                {% endif %}
+
+                {% set address_parts = [] %}
+                {% if comp_addr.city %}{% set _ = address_parts.append(comp_addr.city) %}{% endif %}
+                {% if comp_addr.state %}{% set _ = address_parts.append(comp_addr.state) %}{% endif %}
+                {% if comp_addr.pincode %}{% set _ = address_parts.append("PIN: " ~ comp_addr.pincode) %}{% endif %}
+                {% if comp_addr.country %}{% set _ = address_parts.append(comp_addr.country) %}{% endif %}            
+
+                {{ address_parts | join(", ") }}<br>
               {% endif %}
 
               {% if company_doc.sr_company_cin_no %}
-                <strong>CIN:</strong> {{ company_doc.sr_company_cin_no }}<br>
+                <strong>CIN: </strong>{{ company_doc.sr_company_cin_no }}<br>
+              {% endif %}
+            
+              {% if company_doc.gstin %}
+                <strong>GST No: </strong>{{ company_doc.gstin }}<br>
               {% endif %}
             </td>
 
+            {% if company_doc.phone_no 
+              or company_doc.sr_other_query_no 
+              or company_doc.email 
+              or company_doc.website 
+              or company_doc.sr_opd_timings %}
+
             <!-- RIGHT COLUMN -->
-            <td style="font-size: 12px; line-height: 1.6; vertical-align: top; width: 50%; padding-left: 20px; border-left: 1px solid #eee;">
-            
+            <td style="font-size: 12px; line-height: 1.5; vertical-align: top; width: 50%; padding-left: 20px; border-left: 1px solid #eee;">
+
+              <strong>For any Query:</strong><br>
+
               {% if company_doc.phone_no %}
-              <strong>Phone:</strong> {{ company_doc.phone_no }}<br>
+                <strong>Phone:</strong> {{ company_doc.phone_no }}<br>
               {% endif %}
 
               {% if company_doc.sr_other_query_no %}
-              <strong>For any Query:</strong><br>
-              <strong>Contact Us:</strong> {{ company_doc.sr_query_no }}<br>
+                <strong>Contact Us:</strong> {{ company_doc.sr_other_query_no }}<br>
               {% endif %}
-            
+
               {% if company_doc.email %}
                 <strong>Email:</strong> {{ company_doc.email }}<br>
               {% endif %}
@@ -69,13 +78,15 @@
               {% if company_doc.website %}
                 <strong>Website:</strong> {{ company_doc.website }}<br>
               {% endif %}
-              
-              {% if company_doc.custom_opd_timings %}
+
+              {% if company_doc.sr_opd_timings %}
                 <strong>OPD Timings:</strong><br>
-                {{ company_doc.custom_opd_timings }}
+                {{ company_doc.sr_opd_timings }}
               {% endif %}
-            
+
             </td>
+
+            {% endif %}
           </tr>
         </table>
       </td>
@@ -88,12 +99,13 @@
 <style>
   .hdr-wrap { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111; font-size:10pt; margin-bottom:10pt; }
   .card    { width:100%; border:1.25pt solid #cfd6e4; border-collapse:collapse; table-layout:fixed; font-size:10pt; }
-  .card td { vertical-align:top; padding:10px 0; font-size:10pt; }
+  .card td { vertical-align: top; padding:10px 0; font-size:10pt; }
   .card .left  { width:69%; padding: 0pt !important; }
   .card .right { width:30%; border-left:1.25pt solid #cfd6e4; padding: 0pt !important; }
 
-  .kv            { width:100%; border-collapse:collapse; font-size:10pt; }
+  .kv            { width:100%; height: 100%; border-collapse:collapse; font-size:10pt; }
   .kv tr > td    { padding:3px 0; vertical-align:top; border-bottom:1px solid #e8ebf0; }
+  .kv tr:last-child td { border-bottom: none;}
   .kv tr:last-child > td { border-bottom:0; }
 
   .lbl     { color:#444; white-space:nowrap; border-right:1px solid #e8ebf0; padding-right:0; background:#fafbfc; }
@@ -111,13 +123,20 @@
     font-weight: 600;
   }
 
+  .diet-chart td {
+    border: 1.25pt solid #cfd6e4;
+  }
+  .diet-chart td.lbl {
+    font-weight: 600;
+  }
+
   @media print { .hdr-wrap, .card, .card td, .kv, .kv td { font-size:10pt !important; } }
 </style>
 
 {# -------------------- Resolve Patient + Address/Contact safely -------------------- #}
 {% set patient = frappe.get_doc("Patient", doc.patient) if doc.patient else None %}
 
-{# find Address via Dynamic Link row, then load Address #}
+{# Address #}
 {% set dl = frappe.get_all(
   "Dynamic Link",
   filters={
@@ -131,16 +150,26 @@
 ) if doc.patient else [] %}
 {% set addr = frappe.get_doc("Address", dl[0].parent) if dl else None %}
 
-{% set patient_name  = doc.patient_name or (patient.patient_name if patient else (doc.patient_name or "")) %}
-{% set uhid          = doc.sr_pe_id or (patient.sr_patient_id if patient and patient.sr_patient_id else (doc.patient or "")) %}
-{% set sex           = doc.patient_sex or (patient.sex if patient else "") %}
-{% set age_text      = doc.sr_pe_age or (patient.sr_patient_age if patient and patient.age else "") %}
-{% set dob           = patient.dob if patient and patient.dob else "" %}
-{% set blood_group   = patient.blood_group if patient and patient.blood_group else "" %}
+{# Core fields (PRIORITY: doc → fallback: patient) #}
+{% set patient_name = doc.patient_name or (patient.patient_name if patient and patient.patient_name else "") %}
+{% set uhid = doc.sr_pe_id or (patient.sr_patient_id if patient and patient.sr_patient_id else "") %}
+{% set sex = doc.patient_sex or (patient.sex if patient and patient.sex else "") %}
+{% set age_text = doc.sr_pe_age or (patient.sr_patient_age if patient and patient.sr_patient_age else "") %}
 
-{# phones/emails from Patient #}
-{% set primary_phone = (patient.mobile_no if patient and patient.mobile_no else (patient.phone if patient and patient.phone else "")) %}
-{% set email         = (patient.email or patient.email_id) if patient else "" %}
+{# Direct from patient only #}
+{% set dob = patient.dob if patient else "" %}
+{% set blood_group = patient.blood_group if patient else "" %}
+
+{% set primary_phone = "" %}
+{% if patient %}
+  {% if patient.mobile %}
+    {% set primary_phone = patient.mobile %}
+  {% elif patient.phone %}
+    {% set primary_phone = patient.phone %}
+  {% endif %}
+{% endif %}
+
+{% set email = patient.email if patient and patient.email else "" %}
 
 <div class="hdr-wrap">
   <table class="card">
@@ -148,155 +177,172 @@
       <!-- LEFT: Patient details -->
       <td class="left">
         <table class="kv">
-          <tr>
-            <td class="lbl">Patient Name:</td>
-            <td class="val"><b>{{ patient_name }}</b></td>
-          </tr>
-          <tr>
-            <td class="lbl">UHID / Patient ID:</td>
-            <td class="val">{{ uhid }}</td>
-          </tr>
+          <tbody>
+            <tr>
+              <td class="lbl">Patient Name:</td>
+              <td class="val"><b>{{ patient_name.title() }}</b></td>
+              <!-- <td class="val">
+                <b>
+                  {% if sex == "Male" %}Mr. 
+                  {% elif sex == "Female" %}Ms. 
+                  {% endif %}
+                  {{ patient_name.title() }}
+                </b>
+              </td> -->
+            </tr>
+            <tr>
+              <td class="lbl">UHID / Patient ID:</td>
+              <td class="val">{{ uhid }}</td>
+            </tr>
 
-          {% if age_text or sex %}
-          <tr>
-            <td class="lbl">Age / Sex:</td>
-            <td class="val">{{ (age_text ~ " ") if age_text else "" }}{{ sex }}</td>
-          </tr>
-          {% endif %}
+            {% if age_text or sex %}
+            <tr>
+              <td class="lbl">Age / Sex:</td>
+              <td class="val">
+                {% if age_text and sex %}
+                  {{ age_text }} / {{ sex }}
+                {% elif age_text %}
+                  {{ age_text }}
+                {% else %}
+                  {{ sex }}
+                {% endif %}
+              </td>
+            </tr>
+            {% endif %}
 
-          {% if dob %}
-          <tr>
-            <td class="lbl">Date of Birth:</td>
-            <td class="val">{{ frappe.format(dob, {"fieldtype":"Date"}) }}</td>
-          </tr>
-          {% endif %}
+            {% if addr %}
+            <tr>
+              <td class="lbl">Address:</td>
+              <td class="val addr">
+                {{ addr.address_line1 or "" }}
+                {% if addr.address_line2 %}<br>{{ addr.address_line2 }}{% endif %}
+                {% if addr.city %}<br>{{ addr.city }}{% endif %}, {% if addr.state %} {{ addr.state }}{% endif %}
+                {% if addr.pincode %}<br>PIN: {{ addr.pincode }}{% endif %}, {% if addr.country %} {{ addr.country }}{% endif %}
+              </td>
+            </tr>
+            {% endif %}
 
-          {% if blood_group %}
-          <tr>
-            <td class="lbl">Blood Group:</td>
-            <td class="val">{{ blood_group }}</td>
-          </tr>
-          {% endif %}
+            {% if primary_phone %}
+            <tr>
+              <td class="lbl">Contact:</td>
+              <td class="val">{{ primary_phone }}</td>
+            </tr>
+            {% endif %}
 
-          {% if addr %}
-          <tr>
-            <td class="lbl">Address:</td>
-            <td class="val addr">
-              {{ addr.address_line1 or "" }}
-              {% if addr.address_line2 %}<br>{{ addr.address_line2 }}{% endif %}
-              {% if addr.city %}<br>{{ addr.city }}{% endif %}, {% if addr.state %} {{ addr.state }}{% endif %}
-              <!--{% if addr.state %}<br>{{ addr.state }}{% endif %}-->
-              {% if addr.pincode %}<br>PIN: {{ addr.pincode }}{% endif %}, {% if addr.country %} {{ addr.country }}{% endif %}
-              <!--{% if addr.country %}<br>{{ addr.country }}{% endif %}-->
-            </td>
-          </tr>
-          {% endif %}
+            {% if email %}
+            <tr>
+              <td class="lbl">Email:</td>
+              <td class="val">{{ email }}</td>
+            </tr>
+            {% endif %}
 
-          {% if primary_phone %}
-          <tr>
-            <td class="lbl">Mobile No:</td>
-            <td class="val">{{ primary_phone }}</td>
-          </tr>
-          {% endif %}
+            {% if dob %}
+            <tr>
+              <td class="lbl">Date of Birth:</td>
+              <td class="val">{{ frappe.format(dob, {"fieldtype":"Date"}) }}</td>
+            </tr>
+            {% endif %}
 
-          {% if email %}
-          <tr>
-            <td class="lbl">Email:</td>
-            <td class="val">{{ email }}</td>
-          </tr>
-          {% endif %}
+            {% if blood_group %}
+            <tr>
+              <td class="lbl">Blood Group:</td>
+              <td class="val">{{ blood_group }}</td>
+            </tr>
+            {% endif %}
+
+          </tbody>
         </table>
       </td>
 
       <!-- RIGHT: Encounter info -->
       <td class="right">
         <table class="kv">
-          <tr>
-            <td colspan="2" class="stack">
-              <div class="title">Encounter Date & Time</div>
-              <div class="value">
-                {% if doc.encounter_datetime %}
-                  {{ frappe.format(doc.encounter_datetime, {"fieldtype":"Datetime"}) }}
-                {% elif doc.encounter_date %}
-                  {{ frappe.format(doc.encounter_date, {"fieldtype":"Date"}) }}
-                {% else %}
-                  {{ frappe.format(doc.modified, {"fieldtype":"Datetime"}) }}
-                {% endif %}
-              </div>
-            </td>
-          </tr>
+          <tbody>
 
-          {% if doc.sr_medical_department %}
-          <tr>
-            <td colspan="2" class="stack">
-              <div class="title">Medical Department</div>
-              <div class="value">{{ doc.sr_medical_department }}</div>
-            </td>
-          </tr>
-          {% endif %}
+            <tr>
+              <td colspan="2" class="stack">
+                <div class="title">Encounter Date & Time</div>
+                <div class="value">
 
-          <!--{% if doc.practitioner %}-->
-          <!--<tr>-->
-          <!--  <td colspan="2" class="stack">-->
-          <!--    <div class="title">Practitioner</div>-->
-          <!--    <div class="value">{{ doc.practitioner }}</div>-->
-          <!--  </td>-->
-          <!--</tr>-->
-          <!--{% endif %}-->
+                  {% if doc.encounter_date and doc.encounter_time %}
+                    {{ frappe.format(doc.encounter_date, {"fieldtype":"Date"}) }} 
+                    {{ frappe.format(doc.encounter_time, {"fieldtype":"Time"}) }}
 
-          {% if doc.ayurvedic_practitioner %}
-          <!--<tr>-->
-          <!--  <td colspan="2" class="stack">-->
-          <!--    <div class="title">Ayurvedic Practitioner</div>-->
-          <!--    <div class="value">{{ doc.ayurvedic_practitioner }}</div>-->
-          <!--  </td>-->
-          <!--</tr>-->
-          {% endif %}
+                  {% elif doc.encounter_datetime %}
+                    {{ frappe.format(doc.encounter_datetime, {"fieldtype":"Datetime"}) }}
 
-          {% if doc.homeopathy_practitioner %}
-          <!--<tr>-->
-          <!--  <td colspan="2" class="stack">-->
-          <!--    <div class="title">Homeopathy Practitioner</div>-->
-          <!--    <div class="value">{{ doc.homeopathy_practitioner }}</div>-->
-          <!--  </td>-->
-          <!--</tr>-->
-          {% endif %}
+                  {% else %}
+                    {{ frappe.format(doc.modified, {"fieldtype":"Datetime"}) }}
+                  {% endif %}
 
-          {% if doc.allopathy_practitioner %}
-          <!--<tr>-->
-          <!--  <td colspan="2" class="stack">-->
-          <!--    <div class="title">Allopathy Practitioner</div>-->
-          <!--    <div class="value">{{ doc.allopathy_practitioner }}</div>-->
-          <!--  </td>-->
-          <!--</tr>-->
-          {% endif %}
+                </div>
+              </td>
+            </tr>
 
-          {% if doc.patient_appointment %}
-          <tr>
-            <td colspan="2" class="stack">
-              <div class="title">Appointment</div>
-              <div class="value">{{ doc.patient_appointment }}</div>
-            </td>
-          </tr>
-          {% endif %}
+            {% if doc.sr_pe_deptt %}
+            <tr>
+              <td colspan="2" class="stack">
+                <div class="title">Patient Department</div>
+                <div class="value">{{ doc.sr_pe_deptt }}</div>
+              </td>
+            </tr>
+            {% endif %}
 
-          {% if doc.company %}
-          <!--<tr>-->
-          <!--  <td colspan="2" class="stack">-->
-          <!--    <div class="title">Facility</div>-->
-          <!--    <div class="value">{{ doc.company }}</div>-->
-          <!--  </td>-->
-          <!--</tr>-->
-          {% endif %}
+            <!-- {% if doc.practitioner %} -->
+            <!--<tr>-->
+            <!--  <td colspan="2" class="stack">-->
+            <!--    <div class="title">Practitioner</div>-->
+            <!--    <div class="value">{{ doc.practitioner }}</div>-->
+            <!--  </td>-->
+            <!--</tr>-->
+            <!-- {% endif %} -->
 
-          {% if doc.sr_encounter_type %}
-          <tr>
-            <td colspan="2" class="stack">
-              <div class="title">Encounter Type</div>
-              <div class="value">{{ doc.sr_encounter_type }}</div>
-            </td>
-          </tr>
-          {% endif %}
+            <!-- {% if doc.ayurvedic_practitioner %} -->
+            <!--<tr>-->
+            <!--  <td colspan="2" class="stack">-->
+            <!--    <div class="title">Ayurvedic Practitioner</div>-->
+            <!--    <div class="value">{{ doc.ayurvedic_practitioner }}</div>-->
+            <!--  </td>-->
+            <!--</tr>-->
+            <!-- {% endif %} -->
+
+            <!-- {% if doc.homeopathy_practitioner %} -->
+            <!--<tr>-->
+            <!--  <td colspan="2" class="stack">-->
+            <!--    <div class="title">Homeopathy Practitioner</div>-->
+            <!--    <div class="value">{{ doc.homeopathy_practitioner }}</div>-->
+            <!--  </td>-->
+            <!--</tr>-->
+            <!-- {% endif %} -->
+
+            <!-- {% if doc.allopathy_practitioner %} -->
+            <!--<tr>-->
+            <!--  <td colspan="2" class="stack">-->
+            <!--    <div class="title">Allopathy Practitioner</div>-->
+            <!--    <div class="value">{{ doc.allopathy_practitioner }}</div>-->
+            <!--  </td>-->
+            <!--</tr>-->
+            <!-- {% endif %} -->
+
+            {% if doc.patient_appointment %}
+            <tr>
+              <td colspan="2" class="stack">
+                <div class="title">Appointment</div>
+                <div class="value">{{ doc.patient_appointment }}</div>
+              </td>
+            </tr>
+            {% endif %}
+
+            {% if doc.sr_encounter_type %}
+            <tr>
+              <td colspan="2" class="stack">
+                <div class="title">Encounter Type</div>
+                <div class="value">{{ doc.sr_encounter_type }}</div>
+              </td>
+            </tr>
+            {% endif %}
+
+          </tbody>
         </table>
       </td>
     </tr>
@@ -370,22 +416,48 @@
 {% endif %}
 
 {# ---------- Diet Chart: Only show if exists ---------- #}
-{% if doc.diet_chart %}
+{% set diet_doc = frappe.get_doc("Diet Chart", doc.diet_chart) if doc.diet_chart else None %}
+
+{% if diet_doc %}
 <div class="hdr-wrap">
-  <table class="card">
+  <table class="card diet-chart">
+    <colgroup>
+      <col style="width: 20%;">
+      <col style="width: 80%;">
+    </colgroup>
+    
     <tr>
       <td colspan="2" class="stack">
         <div class="title">Diet Chart</div>
+        <div class="value"><b>{{ diet_doc.diet_chart_name }}</b></div>
       </td>
     </tr>
+
+    {% if diet_doc.instructions %}
     <tr>
-      <td colspan="2" style="padding:10px;">
-        {{ doc.diet_chart }}
-      </td>
+      <td class="lbl">Instructions</td>
+      <td class="val">{{ diet_doc.instructions }}</td>
     </tr>
+    {% endif %}
+
+    {% if diet_doc.allowed_foods %}
+    <tr>
+      <td class="lbl">Allowed Foods</td>
+      <td class="val">{{ diet_doc.allowed_foods }}</td>
+    </tr>
+    {% endif %}
+
+    {% if diet_doc.restricted_foods %}
+    <tr>
+      <td class="lbl">Restricted Foods</td>
+      <td class="val">{{ diet_doc.restricted_foods }}</td>
+    </tr>
+    {% endif %}
+
   </table>
 </div>
 {% endif %}
+
 
 {# ---------- Ayurvedic: Only show if practitioner name exists AND table has at least one non-empty row ---------- #}
 {% set ayu_prac = doc.sr_ayurvedic_practitioner_name or "" %}
@@ -443,7 +515,6 @@
                             <td style="border:1px solid #e8ebf0; padding:6px;">{{ period_txt }}</td>
                             <td style="border:1px solid #e8ebf0; padding:6px;">{{ form_txt }}</td>
                           </tr>
-                    
                           <!-- Instruction Row -->
                           {% if instr_txt %}
                             <tr>
@@ -452,7 +523,7 @@
                                 <strong>Instruction:</strong> {{ instr_txt }}
                               </td>
                             </tr>
-                          {% endif %}                    
+                          {% endif %}
                         {% endif %}
                       {% endfor %}
                     </tbody>
@@ -524,7 +595,6 @@
                             <td style="border:1px solid #e8ebf0; padding:6px;">{{ period_txt }}</td>
                             <td style="border:1px solid #e8ebf0; padding:6px;">{{ form_txt }}</td>
                           </tr>
-                    
                           <!-- Instruction Row -->
                           {% if instr_txt %}
                             <tr>
@@ -603,8 +673,7 @@
                           <td style="border:1px solid #e8ebf0; padding:6px;">{{ dose_txt }}</td>
                           <td style="border:1px solid #e8ebf0; padding:6px;">{{ period_txt }}</td>
                           <td style="border:1px solid #e8ebf0; padding:6px;">{{ form_txt }}</td>
-                        </tr>
-                    
+                        </tr>                  
                         <!-- Instruction Row -->
                         {% if instr_txt %}
                           <tr>
