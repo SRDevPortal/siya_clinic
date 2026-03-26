@@ -97,12 +97,21 @@ def _make_invoice_fields():
                 "insert_after": "created_by_agent",
             },
             {
+                "fieldname": "channel_order",
+                "label": "Channel Order",
+                "fieldtype": "Link",
+                "options": "SR Channel Order",
+                "in_list_view": 1,
+                "in_standard_filter": 1,
+                "insert_after": "created_by_agent",
+            },
+            {
                 "fieldname": "shopify_order_id",
                 "label": "Shopify Order ID",
                 "fieldtype": "Data",
                 "in_list_view": 1,
                 "in_standard_filter": 1,
-                "insert_after": "order_source",
+                "insert_after": "channel_order",
             },
             {
                 "fieldname": "shopify_order_number",
@@ -271,6 +280,12 @@ def _apply_invoice_ui_customizations():
     
     # Set title field to patient_name
     upsert_title_field(PARENT, "patient_name")
+
+    ensure_field_after(PARENT, "order_source", "due_date")
+    ensure_field_after(PARENT, "channel_order", "order_source")
+    ensure_field_after(PARENT, "shopify_order_id", "channel_order")
+    ensure_field_after(PARENT, "shopify_order_number", "shopify_order_id")
+    ensure_field_after(PARENT, "buopso_order_id", "shopify_order_number")
 
     ensure_field_after(PARENT, "sr_si_track_sb", "timesheets")
     ensure_field_after(PARENT, "sr_si_order_source", "sr_si_track_sb")
