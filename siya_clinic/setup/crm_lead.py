@@ -46,12 +46,21 @@ def _make_crm_lead_fields():
                 "insert_after": "sr_lead_details_cb2",
             },
             {
+                "fieldname": "sr_lead_saleteam",
+                "label": "Sales Team",
+                "fieldtype": "Link",
+                "options": "SR Sales Team",
+                "reqd": 1,
+                "in_list_view": 1,
+                "insert_after": "sr_lead_platform",
+            },
+            {
                 "fieldname": "sr_lead_disposition",
                 "label": "Lead Disposition",
                 "fieldtype": "Link",
                 "options": "SR Lead Disposition",
                 "depends_on": "eval: !!doc.status",
-                "insert_after": "sr_lead_platform",
+                "insert_after": "status",
             },
 
             # ---------------- Country & Contact Info ----------------
@@ -233,7 +242,8 @@ def _apply_crm_lead_ui_customizations():
     ensure_field_after(DT, "source", "lead_owner")
 
     ensure_field_after(DT, "sr_lead_details_cb2", "source")
-    ensure_field_after(DT, "status", "sr_lead_platform")
+    ensure_field_after(DT, "sr_lead_saleteam", "sr_lead_platform")
+    ensure_field_after(DT, "status", "sr_lead_saleteam")
     ensure_field_after(DT, "sr_lead_disposition", "status")
 
     upsert_property_setter(DT, "naming_series", "hidden", "1", "Check")
