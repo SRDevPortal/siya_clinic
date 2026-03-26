@@ -37,6 +37,8 @@ def apply():
     create_lead_pipeline_doctype()
     create_lead_platform_doctype()
     create_lead_source_doctype()
+    create_channel_order_doctype()
+    create_sales_team_doctype()
     create_lead_disposition_doctype()
     
     _seed_lead_platforms_data()
@@ -102,7 +104,11 @@ def apply():
     create_multi_mode_payment()
     
     create_item_group_template_item_doctype()
-    create_item_group_template_doctype() 
+    create_item_group_template_doctype()
+
+    # Permission Engine Masters
+    # create_team_member_mapping_doctype()
+    # create_lead_assignment_rule_doctype()
 
     # Integration / Shipping Settings
     create_shipkia_settings()
@@ -345,6 +351,194 @@ def create_lead_source_doctype():
                     "in_list_view": 1,
                 },
             ],
+            "permissions": [
+                {
+                    "role": "System Manager",
+                    "read": 1,
+                    "write": 1,
+                    "create": 1,
+                    "delete": 1,
+                    "print": 1,
+                    "email": 1,
+                    "export": 1,
+                    "report": 1
+                },
+                {
+                    "role": "Healthcare Administrator",
+                    "read": 1,
+                    "write": 1,
+                    "create": 1,
+                    "delete": 1,
+                },
+            ]
+        })
+
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+
+def create_channel_order_doctype():
+    """Create SR Channel Order DocType if missing."""
+
+    doctype = "SR Channel Order"
+
+    if not frappe.db.exists("DocType", doctype):
+
+        logger.info(f"Creating DocType: {doctype}")
+
+        doc = frappe.get_doc({
+            "doctype": "DocType",
+            "name": doctype,
+            "module": MODULE_DEF_NAME,
+            "custom": 1,
+            "autoname": "naming_series:",
+            "allow_rename": 0,
+            "title_field": "channel_order_name",
+            "show_title_field_in_link": 1,
+            "search_fields": "channel_order_name",
+            "show_name_in_global_search": 1,
+            "track_changes": 1,
+            "fields": [
+
+                # 🔹 Naming Series
+                {
+                    "fieldname": "naming_series",
+                    "label": "Series",
+                    "fieldtype": "Select",
+                    "options": "CH-ORD-.#####",
+                    "default": "CH-ORD-.#####",
+                    "reqd": 1,
+                    "hidden": 1
+                },
+
+                {
+                    "fieldname": "channel_order_name",
+                    "label": "Channel Order Name",
+                    "fieldtype": "Data",
+                    "reqd": 1,
+                    "unique": 1,
+                    "in_list_view": 1,
+                    "in_standard_filter": 1,
+                },
+                {
+                    "fieldname": "description",
+                    "label": "Description",
+                    "fieldtype": "Small Text",
+                },
+                {
+                    "fieldname": "is_active",
+                    "label": "Is Active",
+                    "fieldtype": "Check",
+                    "default": 1,
+                    "in_list_view": 1,
+                },
+            ],
+            "permissions": [
+                {
+                    "role": "System Manager",
+                    "read": 1,
+                    "write": 1,
+                    "create": 1,
+                    "delete": 1,
+                    "print": 1,
+                    "email": 1,
+                    "export": 1,
+                    "report": 1
+                },
+                {
+                    "role": "Healthcare Administrator",
+                    "read": 1,
+                    "write": 1,
+                    "create": 1,
+                    "delete": 1,
+                },
+            ]
+        })
+
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+
+def create_sales_team_doctype():
+    """Create SR Sales Team DocType if missing."""
+
+    doctype = "SR Sales Team"
+
+    if not frappe.db.exists("DocType", doctype):
+
+        logger.info(f"Creating DocType: {doctype}")
+
+        doc = frappe.get_doc({
+            "doctype": "DocType",
+            "name": doctype,
+            "module": MODULE_DEF_NAME,
+            "custom": 1,
+            "autoname": "naming_series:",
+            "allow_rename": 0,
+            "title_field": "sr_team_name",
+            "show_title_field_in_link": 1,
+            "search_fields": "sr_team_name",
+            "show_name_in_global_search": 1,
+            "track_changes": 1,
+            "fields": [
+
+                # 🔹 Naming Series
+                {
+                    "fieldname": "naming_series",
+                    "label": "Series",
+                    "fieldtype": "Select",
+                    "options": "TEAM-.#####",
+                    "default": "TEAM-.#####",
+                    "reqd": 1,
+                    "hidden": 1
+                },
+
+                # 🔹 Team Name
+                {
+                    "fieldname": "sr_team_name",
+                    "label": "Sales Team Name",
+                    "fieldtype": "Data",
+                    "reqd": 1,
+                    "unique": 1,
+                    "in_list_view": 1,
+                    "in_standard_filter": 1,
+                },
+
+                # 🔹 Team Leader
+                {
+                    "fieldname": "sr_team_leader",
+                    "label": "Team Leader",
+                    "fieldtype": "Link",
+                    "options": "User",
+                    "reqd": 1,
+                    "in_list_view": 1,
+                },
+
+                # 🔹 Team Members (Child Table style using Table MultiSelect)
+                {
+                    "fieldname": "sr_team_members",
+                    "label": "Team Members",
+                    "fieldtype": "Table MultiSelect",
+                    "options": "User",
+                },
+
+                # 🔹 Description
+                {
+                    "fieldname": "sr_team_description",
+                    "label": "Description",
+                    "fieldtype": "Small Text",
+                },
+
+                # 🔹 Active Toggle
+                {
+                    "fieldname": "is_active",
+                    "label": "Is Active",
+                    "fieldtype": "Check",
+                    "default": 1,
+                    "in_list_view": 1,
+                },
+            ],
+
             "permissions": [
                 {
                     "role": "System Manager",
@@ -2716,6 +2910,161 @@ def create_item_group_template_doctype():
                     "create": 1,
                     "delete": 1,
                     "report": 1
+                }
+            ]
+        })
+
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+
+def create_lead_assignment_rule_doctype():
+    """Create Lead Assignment Rule DocType"""
+
+    doctype = "Lead Assignment Rule"
+
+    if not frappe.db.exists("DocType", doctype):
+
+        doc = frappe.get_doc({
+            "doctype": "DocType",
+            "name": doctype,
+            "module": MODULE_DEF_NAME,
+            "custom": 1,
+            "autoname": "autoincrement",
+            "title_field": "pipeline",
+            "track_changes": 1,
+
+            "fields": [
+                {
+                    "fieldname": "pipeline",
+                    "label": "Pipeline",
+                    "fieldtype": "Link",
+                    "options": "SR Lead Pipeline",
+                    "reqd": 1,
+                    "in_list_view": 1
+                },
+                {
+                    "fieldname": "source",
+                    "label": "Source",
+                    "fieldtype": "Link",
+                    "options": "SR Lead Source",
+                    "reqd": 1,
+                    "in_list_view": 1
+                },
+                {
+                    "fieldname": "team",
+                    "label": "Team",
+                    "fieldtype": "Data",
+                    "reqd": 1,
+                    "in_list_view": 1
+                },
+                {
+                    "fieldname": "role",
+                    "label": "Role",
+                    "fieldtype": "Select",
+                    "options": "Agent\nTeam Leader\nManager",
+                    "reqd": 1,
+                    "in_list_view": 1
+                },
+
+                # 🔐 Permissions
+                {
+                    "fieldname": "can_view",
+                    "label": "Can View",
+                    "fieldtype": "Check",
+                    "default": 1
+                },
+                {
+                    "fieldname": "can_edit",
+                    "label": "Can Edit",
+                    "fieldtype": "Check",
+                    "default": 0
+                },
+                {
+                    "fieldname": "can_assign",
+                    "label": "Can Assign",
+                    "fieldtype": "Check",
+                    "default": 0
+                },
+
+                {
+                    "fieldname": "is_active",
+                    "label": "Is Active",
+                    "fieldtype": "Check",
+                    "default": 1
+                }
+            ],
+
+            "permissions": [
+                {
+                    "role": "System Manager",
+                    "read": 1,
+                    "write": 1,
+                    "create": 1,
+                    "delete": 1
+                }
+            ]
+        })
+
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+
+def create_team_member_mapping_doctype():
+    """Create Team Member Mapping DocType"""
+
+    doctype = "Team Member Mapping"
+
+    if not frappe.db.exists("DocType", doctype):
+
+        doc = frappe.get_doc({
+            "doctype": "DocType",
+            "name": doctype,
+            "module": MODULE_DEF_NAME,
+            "custom": 1,
+            "autoname": "autoincrement",
+            "title_field": "user",
+            "track_changes": 1,
+
+            "fields": [
+                {
+                    "fieldname": "user",
+                    "label": "User",
+                    "fieldtype": "Link",
+                    "options": "User",
+                    "reqd": 1,
+                    "in_list_view": 1
+                },
+                {
+                    "fieldname": "team",
+                    "label": "Team",
+                    "fieldtype": "Data",
+                    "reqd": 1,
+                    "in_list_view": 1
+                },
+                {
+                    "fieldname": "role",
+                    "label": "Role",
+                    "fieldtype": "Select",
+                    "options": "Agent\nTeam Leader\nManager",
+                    "reqd": 1,
+                    "in_list_view": 1
+                },
+                {
+                    "fieldname": "is_active",
+                    "label": "Is Active",
+                    "fieldtype": "Check",
+                    "default": 1
+                }
+            ],
+
+            "permissions": [
+                {
+                    "role": "System Manager",
+                    "read": 1,
+                    "write": 1,
+                    "create": 1,
+                    "delete": 1
                 }
             ]
         })
