@@ -1,5 +1,4 @@
 # siya_clinic/api/crm_lead/guards.py
-# Field-level protection + role helpers for CRM Lead
 
 from __future__ import annotations
 import frappe
@@ -7,13 +6,16 @@ import frappe
 TL = "Team Leader"
 AG = "Agent"
 
-# Locked after first save for TL/Agent
-ALWAYS_LOCK = {"sr_lead_pipeline", "sr_lead_platform", "source", "mobile_no", "phone"}
-# Agents can never change this
-AGENT_LOCK  = {"lead_owner"}
+# Fields with rule:
+# TL → only on insert
+# Agent → never
+LOCK_FIELDS = {"sr_lead_pipeline", "sr_lead_platform", "source", "mobile_no", "phone"}
+
+AGENT_LOCK = {"lead_owner"}
 
 PRIVILEGED_USERS = {"Administrator"}
 PRIVILEGED_ROLES = {"System Manager"}
+
 
 def _roles(user: str) -> set[str]:
     try:
@@ -23,10 +25,8 @@ def _roles(user: str) -> set[str]:
 
 
 def _is_privileged(user: str) -> bool:
-    # 1) explicit usernames
     if user in PRIVILEGED_USERS:
         return True
-    # 2) role-based
     return bool(_roles(user) & PRIVILEGED_ROLES)
 
 
@@ -35,7 +35,6 @@ def _has_role(user: str, role: str) -> bool:
 
 
 def _changed(doc, field: str) -> bool:
-    """Did this field actually change? (on insert: treat non-empty as change)"""
     if doc.is_new():
         val = doc.get(field)
         return val not in (None, "", [])
@@ -44,42 +43,50 @@ def _changed(doc, field: str) -> bool:
 
 
 def guard_restricted_fields(doc, method=None):
-    # Only protect CRM Lead
+
     if doc.doctype != "CRM Lead":
         return
 
-    # programmatic bypass (patches, normalizers, imports)
     if getattr(frappe.flags, "sr_bypass_field_guard", False):
         return
 
     user = frappe.session.user or "Guest"
 
-    # ---- Absolute bypass for Admin / System Manager ----
-    # Unrestricted for Admin/System Manager
+    # 👑 Admin bypass
     if _is_privileged(user):
         return
 
-    is_tl    = _has_role(user, TL)
+    is_tl = _has_role(user, TL)
     is_agent = _has_role(user, AG)
 
-    blocked: set[str] = set()
+    blocked = set()
 
-    # Three locked fields:
-    # - TL can set on INSERT only
-    # - Later edits blocked for TL/Agent
-    # - Agents blocked even on insert
-    for f in ALWAYS_LOCK:
+    # ---------------------------------------------------
+    # 🔒 Main Field Rules
+    # ---------------------------------------------------
+    for f in LOCK_FIELDS:
         if _changed(doc, f):
+
+            # 🆕 On Insert
             if doc.is_new():
                 if not is_tl:
                     blocked.add(f)
+
+            # 💾 After Save
             else:
                 blocked.add(f)
 
-    # Agents cannot change lead_owner
-    if is_agent and _changed(doc, "lead_owner"):
-        blocked.add("lead_owner")
+    # ---------------------------------------------------
+    # 👨‍💻 Agent extra restriction
+    # ---------------------------------------------------
+    if is_agent:
+        for f in AGENT_LOCK:
+            if _changed(doc, f):
+                blocked.add(f)
 
+    # ---------------------------------------------------
+    # ❌ Block
+    # ---------------------------------------------------
     if blocked:
         frappe.throw(
             "You are not allowed to change: " + ", ".join(sorted(blocked)),
