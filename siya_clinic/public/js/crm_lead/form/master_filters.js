@@ -16,7 +16,7 @@ function apply_active_master_filters(frm) {
 
   const active = { is_active: 1 };
 
-  // Pipeline
+  // Lead Pipeline
   frm.set_query("sr_lead_pipeline", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
@@ -27,7 +27,7 @@ function apply_active_master_filters(frm) {
     page_length: 100
   }));
 
-  // Platform
+  // Lead Platform
   frm.set_query("sr_lead_platform", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
@@ -38,7 +38,7 @@ function apply_active_master_filters(frm) {
     page_length: 100
   }));
 
-  // Source
+  // Lead Source
   frm.set_query("source", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
@@ -49,7 +49,18 @@ function apply_active_master_filters(frm) {
     page_length: 100
   }));
 
-  // Disease
+  // Sales Team
+  frm.set_query("sr_lead_saleteam", () => ({
+    query: "siya_clinic.api.common.link_queries.master_query",
+    filters: {
+      ...active,
+      field: "sr_team_name",
+      order: "asc"
+    },
+    page_length: 100
+  }));
+
+  // Lead Disease
   frm.set_query("sr_lead_disease", () => ({
     query: "siya_clinic.api.common.link_queries.master_query",
     filters: {
