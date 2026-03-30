@@ -33,11 +33,10 @@ def apply():
     # Reload local JSON DocTypes
     reload_local_json_doctypes(JSON_DOCTYPES)
     
-    # CRM Masters
     create_lead_pipeline_doctype()
     create_lead_platform_doctype()
     create_lead_source_doctype()
-    create_channel_order_doctype()
+    create_order_channel_doctype()
     create_sales_team_doctype()
     create_lead_disposition_doctype()
     
@@ -75,7 +74,6 @@ def apply():
     create_practitioner_pathy_doctype()
     _seed_practitioner_pathies_data()
 
-    # Create DocTypes for Encounter
     create_encounter_type_doctype()
     _seed_encounter_type_data()
     
@@ -377,10 +375,10 @@ def create_lead_source_doctype():
         frappe.db.commit()
 
 
-def create_channel_order_doctype():
-    """Create SR Channel Order DocType if missing."""
+def create_order_channel_doctype():
+    """Create SR Order Channel DocType if missing."""
 
-    doctype = "SR Channel Order"
+    doctype = "SR Order Channel"
 
     if not frappe.db.exists("DocType", doctype):
 
@@ -393,9 +391,9 @@ def create_channel_order_doctype():
             "custom": 1,
             "autoname": "naming_series:",
             "allow_rename": 0,
-            "title_field": "channel_order_name",
+            "title_field": "order_channel_name",
             "show_title_field_in_link": 1,
-            "search_fields": "channel_order_name",
+            "search_fields": "order_channel_name",
             "show_name_in_global_search": 1,
             "track_changes": 1,
             "fields": [
@@ -410,15 +408,22 @@ def create_channel_order_doctype():
                     "reqd": 1,
                     "hidden": 1
                 },
-
                 {
-                    "fieldname": "channel_order_name",
-                    "label": "Channel Order Name",
+                    "fieldname": "order_channel_name",
+                    "label": "Order Channel Name",
                     "fieldtype": "Data",
                     "reqd": 1,
                     "unique": 1,
                     "in_list_view": 1,
                     "in_standard_filter": 1,
+                },
+                {
+                    "fieldname": "order_source",
+                    "label": "Order Source",
+                    "fieldtype": "Link",
+                    "options": "SR Lead Source",
+                    "reqd": 1,
+                    "in_list_view": 1,
                 },
                 {
                     "fieldname": "description",
@@ -510,17 +515,17 @@ def create_sales_team_doctype():
                     "label": "Team Leader",
                     "fieldtype": "Link",
                     "options": "User",
-                    "reqd": 1,
-                    "in_list_view": 1,
+                    "reqd": 0,
+                    "in_list_view": 0,
                 },
 
                 # 🔹 Team Members (Child Table style using Table MultiSelect)
-                {
-                    "fieldname": "sr_team_members",
-                    "label": "Team Members",
-                    "fieldtype": "Table MultiSelect",
-                    "options": "User",
-                },
+                # {
+                #     "fieldname": "sr_team_members",
+                #     "label": "Team Members",
+                #     "fieldtype": "Table MultiSelect",
+                #     "options": "SR Sales Team Member",
+                # },
 
                 # 🔹 Description
                 {
