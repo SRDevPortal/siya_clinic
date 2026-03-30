@@ -97,10 +97,10 @@ def _make_invoice_fields():
                 "insert_after": "created_by_agent",
             },
             {
-                "fieldname": "channel_order",
-                "label": "Channel Order",
+                "fieldname": "order_channel",
+                "label": "Order Channel",
                 "fieldtype": "Link",
-                "options": "SR Channel Order",
+                "options": "SR Order Channel",
                 "in_list_view": 1,
                 "in_standard_filter": 1,
                 "insert_after": "created_by_agent",
@@ -130,6 +130,16 @@ def _make_invoice_fields():
                 "in_standard_filter": 1,
                 "in_global_search": 1,
                 "insert_after": "shopify_order_number",
+            },
+            {
+                "fieldname": "shipkia_awb_number",
+                "label": "AWB Number",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "in_list_view": 1,
+                "in_standard_filter": 1,
+                "in_global_search": 1,
+                "insert_after": "buopso_order_id",
             },
 
 
@@ -282,8 +292,8 @@ def _apply_invoice_ui_customizations():
     upsert_title_field(PARENT, "patient_name")
 
     ensure_field_after(PARENT, "order_source", "due_date")
-    ensure_field_after(PARENT, "channel_order", "order_source")
-    ensure_field_after(PARENT, "shopify_order_id", "channel_order")
+    ensure_field_after(PARENT, "order_channel", "order_source")
+    ensure_field_after(PARENT, "shopify_order_id", "order_channel")
     ensure_field_after(PARENT, "shopify_order_number", "shopify_order_id")
     ensure_field_after(PARENT, "buopso_order_id", "shopify_order_number")
 
