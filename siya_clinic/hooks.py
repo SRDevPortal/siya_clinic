@@ -167,6 +167,7 @@ doc_events = {
     "Sales Invoice": {
         "before_insert": [
             "siya_clinic.api.sales_invoice.handlers.set_created_by_agent",
+            "siya_clinic.api.sales_invoice.order_channel.auto_set_order_channel",
         ],
         "validate": [
             "siya_clinic.api.sales_invoice.guard.validate_sales_invoice_warehouse",
@@ -238,6 +239,7 @@ doctype_js = {
         "public/js/item/package_weight.js",
     ],
     "Sales Invoice": [
+        "public/js/sales_invoice/form/master_filters.js",
         "public/js/sales_invoice/template_loader.js",
         "public/js/sales_invoice/actions.js",
         "public/js/sales_invoice/barcode.js",
