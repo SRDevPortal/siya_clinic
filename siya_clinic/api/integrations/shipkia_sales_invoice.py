@@ -323,10 +323,24 @@ def _build_payload_from_so(si) -> Dict[str, Any]:
         cstr(billing.address_line2),
     ]))
 
+    # ❗ STRICT: Order Channel required
+    if not si.order_channel:
+        frappe.throw("Order Channel is mandatory before sending to Shipkia.")
+
+    # Fetch actual name (NOT ID)
+    channel_name = frappe.db.get_value(
+        "SR Order Channel",
+        si.order_channel,
+        "order_channel_name"
+    )
+
+    if not channel_name:
+        frappe.throw("Order Channel Name is missing in SR Order Channel master.")
+
     payload = {
         # Meta
         "pickup_address": cstr(s.pickup_address),
-        "order_channel": cstr(s.order_channel or "erpstore"),
+        "order_channel": cstr(channel_name),
 
         # Delivery
         "delivery_full_name": cstr(si.customer_name),
