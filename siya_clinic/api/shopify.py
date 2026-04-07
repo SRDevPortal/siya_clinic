@@ -49,6 +49,12 @@ def _lead_source_doctype():
     return "Lead Source"
 
 
+def _order_channel_doctype():
+    if frappe.db.exists("DocType", "SR Order Channel"):
+        return "SR Order Channel"
+    return None
+
+
 def _resolve_company(val):
     # 1) If nothing passed, use default or the only company
     if not val:
@@ -784,6 +790,15 @@ def _create_sales_invoice(payload, customer, patient):
     def _add_custom(fieldname, value):
         if si_meta.has_field(fieldname) and value not in (None, "", []):
             si_data[fieldname] = value
+    
+    # Shopify IDs can exceed INT limit
+    def _safe_id(val):
+        if not val:
+            return None
+        try:
+            return str(int(str(val).strip()))
+        except Exception:
+            return str(val).strip()
 
     # Order Source (Link-safe)
     lead_source_dt = _lead_source_doctype()
@@ -821,15 +836,52 @@ def _create_sales_invoice(payload, customer, patient):
                 filters,
                 "name"
             )
+    
+    # ----------------------------
+    # Order Channel (Smart Link-safe)
+    # ----------------------------
+    channel_dt = _order_channel_doctype()
 
-    # Shopify IDs can exceed INT limit
-    def _safe_id(val):
-        if not val:
-            return None
-        try:
-            return str(int(str(val).strip()))
-        except Exception:
-            return str(val).strip()
+    _channel_val = (payload.get("order_channel") or "").strip()
+    _source_val = name  # resolved order_source
+
+    if channel_dt and _channel_val:
+
+        # ✅ Case 1: If already a valid docname → use directly
+        if frappe.db.exists(channel_dt, _channel_val):
+            channel_name = _channel_val
+
+        else:
+            # ✅ Case 2: Treat as label → find/create
+            filters = {
+                "order_channel_name": _channel_val,
+                "is_active": 1
+            }
+
+            channel_name = frappe.db.get_value(
+                channel_dt,
+                filters,
+                "name"
+            )
+
+            if not channel_name:
+                try:
+                    doc = frappe.get_doc({
+                        "doctype": channel_dt,
+                        "order_channel_name": _channel_val,
+                        "order_source": _source_val
+                    }).insert(ignore_permissions=True)
+
+                    channel_name = doc.name
+
+                except frappe.DuplicateEntryError:
+                    channel_name = frappe.db.get_value(
+                        channel_dt,
+                        filters,
+                        "name"
+                    )
+
+        _add_custom("order_channel", channel_name)
 
     _add_custom("order_source", name)
     _add_custom("shopify_order_id", _safe_id(payload.get("shopify_order_id")))
