@@ -456,6 +456,18 @@ def validate_online_encounter_source(doc, method=None):
         )
 
 
+def validate_order_items_required(doc, method=None):
+    """
+    Block saving Patient Encounter if Order Items are empty
+    for Order + (Online or OPD) encounters
+    """
+
+    if _is_order_online(doc) and not doc.get("sr_pe_order_items"):
+        frappe.throw(
+            "You must add at least one item in <b>Order Items</b> before saving."
+        )
+
+
 def validate_encounter_workflow(doc, method):
     roles = frappe.get_roles(frappe.session.user)
 
@@ -737,8 +749,7 @@ def validate_required_before_submit(doc, method):
         raise
 
 
-
-# Create an Draft Sales Invoice from Encounter
+# Create a Draft Sales Invoice from Encounter on submit (instead of on save) to avoid creating multiple drafts during Encounter edits.
 def create_billing_on_submit(doc, method):
     """Run on Patient Encounter submit and create DRAFT SI (+ DRAFT PE if advance)."""
     if doc.docstatus != 1:
