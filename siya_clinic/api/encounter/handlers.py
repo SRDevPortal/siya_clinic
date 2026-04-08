@@ -406,8 +406,6 @@ def _create_draft_payment_entry(
     return pe.name
 
 
-
-
 # ---------------- Event Handlers ----------------
 def validate_agent_status_change(doc, method):
     user = frappe.session.user
