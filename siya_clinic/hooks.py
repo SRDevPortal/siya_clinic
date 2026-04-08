@@ -243,7 +243,7 @@ doctype_js = {
         "public/js/sales_invoice/template_loader.js",
         "public/js/sales_invoice/actions.js",
         "public/js/sales_invoice/barcode.js",
-        "public/js/sales_invoice/shipkia.js",
+        # "public/js/sales_invoice/shipkia.js",
     ],
     "Payment Entry": [
         "public/js/payment_entry/outstanding_dialog.js",
