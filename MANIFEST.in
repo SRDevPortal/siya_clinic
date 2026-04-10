@@ -1,0 +1,18 @@
+include pyproject.toml
+include README.md
+include LICENSE
+
+recursive-include siya_clinic *.json
+recursive-include siya_clinic *.py
+recursive-include siya_clinic *.js
+recursive-include siya_clinic *.css
+recursive-include siya_clinic *.html
+recursive-include siya_clinic *.md
+recursive-include siya_clinic *.svg
+recursive-include siya_clinic *.png
+recursive-include siya_clinic *.jpg
+recursive-include siya_clinic *.csv
+recursive-include siya_clinic *.txt
+
+recursive-exclude * __pycache__
+recursive-exclude * *.py[cod]
