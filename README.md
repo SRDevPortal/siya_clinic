@@ -48,7 +48,7 @@ bench restart
 
 ---
 
-### Contributing
+## Contributing
 
 This app uses `pre-commit` for code formatting and linting. Please install pre-commit and enable it for this repository:
 
