@@ -50,7 +50,7 @@ def _make_crm_lead_fields():
                 "label": "Sales Team",
                 "fieldtype": "Link",
                 "options": "SR Sales Team",
-                "reqd": 1,
+                "reqd": 0,
                 "in_list_view": 1,
                 "insert_after": "sr_lead_platform",
             },
@@ -245,8 +245,6 @@ def _apply_crm_lead_ui_customizations():
     ensure_field_after(DT, "sr_lead_saleteam", "sr_lead_platform")
     ensure_field_after(DT, "status", "sr_lead_saleteam")
     ensure_field_after(DT, "sr_lead_disposition", "status")
-
-    upsert_property_setter(DT, "naming_series", "hidden", "1", "Check")
 
     # ---------- Hide Unused Fields ----------
     targets = (
