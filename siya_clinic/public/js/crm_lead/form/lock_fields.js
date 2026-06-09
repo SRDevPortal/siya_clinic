@@ -1,48 +1,20 @@
-// // siya_clinic/public/js/crm_lead/form/lock_fields.js
-// // Loaded via hooks doctype_js for "CRM Lead"
-
+// Loaded Client Script via hooks doctype_js for on "CRM Lead"
 frappe.ui.form.on('CRM Lead', {
   refresh(frm) {
+    const is_new = frm.is_new();
 
-    const is_tl  = frappe.user.has_role('Team Leader');
-    const is_sys = frappe.user.has_role('System Manager') || frappe.session.user === 'Administrator';
-    const is_agent = frappe.user.has_role('Agent');
+    frappe.call({
+      method: 'siya_clinic.api.crm_lead.controller.get_crm_lead_role_context',
+      callback(r) {
+        const context = r.message || {};
+        if (context.is_privileged) return;
 
-    const fields = [
-      'sr_lead_pipeline',
-      'sr_lead_platform',
-      'source',
-      'sr_lead_saleteam',
-      'mobile_no',
-      'phone'
-    ];
+        // Lock field unless this is a new lead and the current user is a configured Team Leader.
+        const is_tl = !!context.has_team_leader_role;
+        const lock = (f) => frm.set_df_property(f, 'read_only', !(is_new && is_tl));
 
-    // 🔒 Default: lock everything
-    fields.forEach(f => frm.set_df_property(f, 'read_only', 1));
-    frm.set_df_property('lead_owner', 'read_only', 1);
-    frm.set_df_property('lead_owner', 'hidden', 0);
-
-    // 👑 System Manager
-    if (is_sys) {
-      fields.forEach(f => frm.set_df_property(f, 'read_only', 0));
-      frm.set_df_property('lead_owner', 'read_only', 0);
-    }
-
-    // 👨‍💼 Team Leader
-    else if (is_tl) {
-      if (frm.is_new()) {
-        fields.forEach(f => frm.set_df_property(f, 'read_only', 0));
-        frm.set_df_property('lead_owner', 'read_only', 0);
-      } else {
-        // After save → only lead_owner editable
-        frm.set_df_property('lead_owner', 'read_only', 0);
+        (context.lock_after_insert_fields || []).forEach(lock);
       }
-    }
-
-    // 👨‍💻 Agent
-    else if (is_agent) {
-      // Everything locked already
-      frm.set_df_property('lead_owner', 'hidden', 1);
-    }
+    });
   }
 });

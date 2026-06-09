@@ -1,135 +1,83 @@
 # siya_clinic/api/crm_lead/guards.py
+# Field-level protection + role helpers for CRM Lead
 
 from __future__ import annotations
+
 import frappe
 
-# ---------------------------------------------------------
-# Roles
-# ---------------------------------------------------------
-TL = "Team Leader"
-AG = "Agent"
-
-# ---------------------------------------------------------
-# Field Rules
-# ---------------------------------------------------------
-# TL → only on insert
-# Agent → never
-LOCK_FIELDS = {
-    "sr_lead_pipeline",
-    "sr_lead_platform",
-    "source",
-    "sr_lead_saleteam",
-    "mobile_no",
-    "phone",
-}
-
-# Agent extra restriction
-AGENT_LOCK = {"lead_owner"}
-
-# Privileged bypass
-PRIVILEGED_USERS = {"Administrator"}
-PRIVILEGED_ROLES = {"System Manager"}
-
-
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
-def _roles(user: str) -> set[str]:
-    try:
-        return set(frappe.get_roles(user) or [])
-    except Exception:
-        return set()
+from siya_clinic.api.crm_lead.config import REF_DOCTYPE, get_config, get_locked_fields
 
 
 def _is_privileged(user: str) -> bool:
-    if user in PRIVILEGED_USERS:
-        return True
-    return bool(_roles(user) & PRIVILEGED_ROLES)
+	from sriaas_role_permissions.api.roles import is_privileged
+
+	return is_privileged(user, REF_DOCTYPE)
 
 
-def _has_role(user: str, role: str) -> bool:
-    return role in _roles(user)
+def _has_team_leader_role(user: str) -> bool:
+	from sriaas_role_permissions.api.roles import has_team_leader_role
+
+	return has_team_leader_role(user, REF_DOCTYPE)
+
+
+def _has_agent_role(user: str) -> bool:
+	from sriaas_role_permissions.api.roles import has_agent_role
+
+	return has_agent_role(user, REF_DOCTYPE)
 
 
 def _changed(doc, field: str, old_doc=None) -> bool:
-    """Check if field value changed"""
-    if doc.is_new():
-        val = doc.get(field)
-        return val not in (None, "", [])
+	if doc.is_new():
+		value = doc.get(field)
+		return value not in (None, "", [])
 
-    return (doc.get(field) or "") != (old_doc.get(field) or "")
+	if old_doc:
+		return (doc.get(field) or "") != (old_doc.get(field) or "")
 
-
-# def _changed(doc, field: str) -> bool:
-#     if doc.is_new():
-#         val = doc.get(field)
-#         return val not in (None, "", [])
-#     prev = frappe.db.get_value(doc.doctype, doc.name, field)
-#     return (doc.get(field) or "") != (prev or "")
+	previous = frappe.db.get_value(doc.doctype, doc.name, field)
+	return (doc.get(field) or "") != (previous or "")
 
 
-# ---------------------------------------------------------
-# Main Guard
-# ---------------------------------------------------------
 def guard_restricted_fields(doc, method=None):
+	config = get_config()
+	if doc.doctype != config.ref_doctype:
+		return
 
-    if doc.doctype != "CRM Lead":
-        return
+	if getattr(frappe.flags, "sr_bypass_field_guard", False):
+		return
 
-    # Bypass flag (for scripts, patches, etc.)
-    if getattr(frappe.flags, "sr_bypass_field_guard", False):
-        return
+	user = frappe.session.user or "Guest"
+	if _is_privileged(user):
+		return
 
-    user = frappe.session.user or "Guest"
+	is_team_leader = _has_team_leader_role(user)
+	is_agent = _has_agent_role(user)
+	locked_fields = get_locked_fields()
+	lock_after_insert = locked_fields["lock_after_insert"]
+	agent_always_lock = locked_fields["agent_always_lock"]
 
-    # 👑 Admin / System Manager bypass
-    if _is_privileged(user):
-        return
+	blocked: set[str] = set()
+	old_doc = None if doc.is_new() else doc.get_doc_before_save()
 
-    roles = _roles(user)
-    is_tl = TL in roles
-    is_agent = AG in roles
+	for fieldname in lock_after_insert:
+		if not _changed(doc, fieldname, old_doc):
+			continue
 
-    blocked = set()
+		if doc.is_new():
+			if not is_team_leader:
+				blocked.add(fieldname)
+		else:
+			blocked.add(fieldname)
 
-    # Fetch old doc once (performance optimized)
-    old_doc = None
-    if not doc.is_new():
-        old_doc = doc.get_doc_before_save()
+	if is_agent:
+		for fieldname in agent_always_lock:
+			if _changed(doc, fieldname, old_doc):
+				blocked.add(fieldname)
 
-    # ---------------------------------------------------
-    # 🔒 Main Field Rules
-    # ---------------------------------------------------
-    for f in LOCK_FIELDS:
-        if _changed(doc, f, old_doc):
-
-            # 🆕 On Insert
-            if doc.is_new():
-                if not is_tl:
-                    blocked.add(f)
-
-            # 💾 After Save → always locked
-            else:
-                blocked.add(f)
-
-    # ---------------------------------------------------
-    # 👨‍💻 Agent extra restriction
-    # ---------------------------------------------------
-    if is_agent:
-        for f in AGENT_LOCK:
-            if _changed(doc, f, old_doc):
-                blocked.add(f)
-
-    # ---------------------------------------------------
-    # ❌ Block changes
-    # ---------------------------------------------------
-    if blocked:
-        meta = frappe.get_meta(doc.doctype)
-
-        # Convert fieldnames → labels for better UX
-        labels = [meta.get_label(f) or f for f in sorted(blocked)]
-
-        frappe.throw(
-            "You are not allowed to modify restricted fields:<br><b>{}</b>".format(", ".join(labels)),
-            title="Permission Denied",
-        )
+	if blocked:
+		meta = frappe.get_meta(doc.doctype)
+		labels = [meta.get_label(fieldname) or fieldname for fieldname in sorted(blocked)]
+		frappe.throw(
+			"You are not allowed to modify restricted fields:<br><b>{}</b>".format(", ".join(labels)),
+			title="Permission Denied",
+		)
