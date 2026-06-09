@@ -150,10 +150,14 @@ doc_events = {
             "siya_clinic.api.encounter.handlers.set_created_by_agent",
             "siya_clinic.api.encounter.handlers.set_default_encounter_status",
         ],
+        "after_insert": [
+            "siya_clinic.api.crm_lead.attachments.copy_crm_lead_attachments_to_encounter",
+        ],
         "before_save": [
             "siya_clinic.api.encounter.handlers.enforce_agent_encounter_place",
             "siya_clinic.api.encounter.handlers.before_save_patient_encounter",
             "siya_clinic.api.encounter.handlers.clear_advance_dependent_fields",
+            "siya_clinic.api.s3_bucket.file_hooks.cleanup_payment_proof_removals",
         ],
         "before_submit": [
             "siya_clinic.api.encounter.handlers.validate_required_before_submit",
@@ -196,14 +200,14 @@ doc_events = {
             "siya_clinic.api.crm_lead.assign_guard.todo_on_trash",
         ],
     },
-    # "File": {
-    #     "after_insert": [
-    #         "siya_clinic.api.s3_bucket.file_hooks.handle_file_after_insert",
-    #     ],
-    #     "on_trash": [
-    #         "siya_clinic.api.s3_bucket.file_hooks.handle_file_on_trash",
-    #     ],
-    # }
+    "File": {
+        "after_insert": [
+            "siya_clinic.api.s3_bucket.file_hooks.handle_file_after_insert",
+        ],
+        "on_trash": [
+            "siya_clinic.api.s3_bucket.file_hooks.handle_file_on_trash",
+        ],
+    },
 }
 
 doctype_js = {
@@ -216,6 +220,7 @@ doctype_js = {
         "public/js/common/clinical_history.js",
     ],
     "CRM Lead": [
+        "public/js/common/s3_attachment_links.js",
         "public/js/crm_lead/form/master_filters.js",
         "public/js/crm_lead/form/disposition_filter.js",
         "public/js/crm_lead/form/lock_fields.js",
@@ -230,8 +235,8 @@ doctype_js = {
         "public/js/encounter/medication_filters.js",  # Linked to Medication Filters JS
         "public/js/encounter/medication_template.js", # Load Medication From Template JS
         "public/js/encounter/medication_manual.js", # # Load Medication From Manual JS
-        "public/js/encounter/draft_invoice.js",     # Linked to Draft Invoice JS
-        "public/js/encounter/order_item.js",        # Linked to SR Order Item JS
+        "public/js/encounter/draft_invoice.js", # Linked to Draft Invoice JS
+        "public/js/encounter/order_item.js", # Linked to SR Order Item JS
         # "public/js/encounter_block_autosave_for_proof.js",
         # "public/js/encounter_attachments.js",
         "public/js/common/clinical_history.js",
@@ -259,11 +264,6 @@ doctype_js = {
 override_whitelisted_methods = {
     # Allow Shopify Full Invoice API to create Sales Invoices in our system
     "siya_clinic.api.shopify.create_shopify_order": "siya_clinic.api.shopify.create_shopify_order",
-
-    # Override default assign_to behavior to use our custom assignment logic
-    "frappe.desk.form.assign_to.add": "siya_clinic.api.crm_lead.assign_guard.add",
-    "frappe.desk.form.assign_to.remove": "siya_clinic.api.crm_lead.assign_guard.remove",
-    "frappe.desk.form.assign_to.clear": "siya_clinic.api.crm_lead.assign_guard.clear",
 }
 
 fixtures = [
