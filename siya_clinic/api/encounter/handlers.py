@@ -328,9 +328,21 @@ def _party_account(company: str, party_type: str, party: str) -> Optional[str]:
 
 
 def _mop_account(company: str, mop: str) -> Optional[str]:
-    acc = frappe.db.get_value("Mode of Payment Account", {"parent": mop, "company": company}, "default_account")
+    acc = frappe.db.get_value(
+        "Mode of Payment Account",
+        {"parent": mop, "company": company},
+        "default_account",
+    )
+    if not acc and frappe.get_meta("Mode of Payment Account").has_field("account"):
+        acc = frappe.db.get_value(
+            "Mode of Payment Account",
+            {"parent": mop, "company": company},
+            "account",
+        )
     if not acc:
-        acc = frappe.db.get_value("Mode of Payment Account", {"parent": mop, "company": company}, "account")
+        acc = frappe.db.get_value("Company", company, "default_bank_account")
+    if not acc:
+        acc = frappe.db.get_value("Company", company, "default_cash_account")
     return acc
 
 
@@ -710,11 +722,16 @@ def validate_required_before_submit(doc, method):
                 ref_no = r.get("mmp_reference_no")
                 ref_date = r.get("mmp_reference_date")
                 proof = r.get("mmp_payment_proof")
+                provider_proof = bool(r.get("mmp_payment_intent") and r.get("mmp_provider_payment_id"))
             else:
                 mop = (getattr(r, "mmp_mode_of_payment", None) or "").strip()
                 ref_no = getattr(r, "mmp_reference_no", None)
                 ref_date = getattr(r, "mmp_reference_date", None)
                 proof = getattr(r, "mmp_payment_proof", None)
+                provider_proof = bool(
+                    getattr(r, "mmp_payment_intent", None)
+                    and getattr(r, "mmp_provider_payment_id", None)
+                )
 
             row_missing = []
 
@@ -730,8 +747,8 @@ def validate_required_before_submit(doc, method):
                 if not ref_date:
                     row_missing.append("Reference Date")
 
-                # Proof required: either row-level OR sidebar attachment
-                has_proof = bool(proof) or _has_any_attachment(doc)
+                # Provider-paid rows carry their gateway transaction details as proof.
+                has_proof = bool(proof) or _has_any_attachment(doc) or provider_proof
                 if not has_proof:
                     row_missing.append("Payment Proof")
 
@@ -745,6 +762,30 @@ def validate_required_before_submit(doc, method):
         frappe.log_error(frappe.get_traceback(), "validate_required_before_submit_error")
         # Re-raise to block submit if validation code itself fails.
         raise
+
+
+def _sync_payment_orchestrator_billing_result(row, sales_invoice, payment_entry, allocated_amount):
+    """Optionally link Encounter-created billing artifacts back to Payment Orchestrator."""
+    payment_intent = getattr(row, "mmp_payment_intent", None)
+    if not payment_intent:
+        return
+
+    try:
+        if "payment_orchestrator" not in frappe.get_installed_apps():
+            return
+
+        sync = frappe.get_attr("payment_orchestrator.logic.link_encounter_billing_result")
+        sync(
+            payment_intent=payment_intent,
+            sales_invoice=sales_invoice,
+            payment_entry=payment_entry,
+            allocated_amount=allocated_amount,
+        )
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            f"Payment Orchestrator back-sync failed for {payment_intent}",
+        )
 
 
 # Create a Draft Sales Invoice from Encounter on submit (instead of on save) to avoid creating multiple drafts during Encounter edits.
@@ -991,6 +1032,7 @@ def _create_billing_drafts_from_encounter(doc):
                     "mmp_payment_entry": pe_name,
                     "mmp_posting_date": frappe.db.get_value("Payment Entry", pe_name, "posting_date")
                 }, update_modified=False)
+                _sync_payment_orchestrator_billing_result(m, si.name, pe_name, m_amt)
             except Exception:
                 frappe.log_error(frappe.get_traceback(),
                                  f"Failed linking PE {pe_name} back to encounter child row {getattr(m,'name', '<no-name>')}")

@@ -2701,86 +2701,182 @@ def create_multi_mode_payment():
 
     doctype = "SR Multi Mode Payment"
 
-    if not frappe.db.exists("DocType", doctype):
+    if frappe.db.exists("DocType", doctype):
+        _ensure_sr_multi_mode_payment_orchestrator_fields()
+        return
 
-        logger.info(f"Creating DocType: {doctype}")
+    logger.info(f"Creating DocType: {doctype}")
 
-        doc = frappe.get_doc({
-            "doctype": "DocType",
-            "name": doctype,
-            "module": MODULE_DEF_NAME,
-            "custom": 1,
-            "istable": 1,  # Indicates it's a child table
-            "editable_grid": 1,  # Editable grid option
-            "issingle": 0,
-            "track_changes": 1,
-            "field_order": [
-                "mmp_paid_amount",
-                "mmp_mode_of_payment",
-                "mmp_reference_no",
-                "mmp_reference_date",
-                "mmp_payment_proof",
-                "mmp_payment_entry",
-                "mmp_posting_date",
-            ],
-            "fields": [
-                {
-                    "fieldname": "mmp_paid_amount",
-                    "label": "Paid Amount",
-                    "fieldtype": "Currency",
-                    "in_list_view": 1,
-                    "columns": 1,
-                },
-                {
-                    "fieldname": "mmp_mode_of_payment",
-                    "label": "Mode of Payment",
-                    "fieldtype": "Link",
-                    "options": "Mode of Payment",
-                    "in_list_view": 1,
-                    "columns": 2,
-                },
-                {
-                    "fieldname": "mmp_reference_no",
-                    "label": "Reference No",
-                    "fieldtype": "Data",
-                    "in_list_view": 1,
-                    "columns": 2,
-                },
-                {
-                    "fieldname": "mmp_reference_date",
-                    "label": "Reference Date",
-                    "fieldtype": "Date",
-                    "in_list_view": 1,
-                    "columns": 2,
-                },
-                {
-                    "fieldname": "mmp_payment_proof",
-                    "label": "Payment Proof",
-                    "fieldtype": "Attach",
-                    "in_list_view": 1,
-                    "columns": 3,
-                },
-                {
-                    "fieldname": "mmp_payment_entry",
-                    "label": "Payment Entry",
-                    "fieldtype": "Link",
-                    "options": "Payment Entry",
-                    "in_list_view": 0,
-                    "columns": 1,
-                },
-                {
-                    "fieldname": "mmp_posting_date",
-                    "label": "Posting Date",
-                    "fieldtype": "Date",
-                    "in_list_view": 0,
-                    "columns": 1,
-                },
-            ],
-            "permissions": [],  # You can specify permissions here if needed
-        })
-        
-        doc.insert(ignore_permissions=True)
-        frappe.db.commit()
+    doc = frappe.get_doc({
+        "doctype": "DocType",
+        "name": doctype,
+        "module": MODULE_DEF_NAME,
+        "custom": 1,
+        "istable": 1,  # Indicates it's a child table
+        "editable_grid": 1,  # Editable grid option
+        "issingle": 0,
+        "track_changes": 1,
+        "field_order": [
+            "mmp_paid_amount",
+            "mmp_mode_of_payment",
+            "mmp_reference_no",
+            "mmp_reference_date",
+            "mmp_payment_proof",
+            "mmp_payment_entry",
+            "mmp_posting_date",
+            "mmp_payment_intent",
+            "mmp_provider_payment_id",
+            "mmp_gateway",
+            "mmp_payment_mode",
+            "mmp_orchestrator_status",
+        ],
+        "fields": [
+            {
+                "fieldname": "mmp_paid_amount",
+                "label": "Paid Amount",
+                "fieldtype": "Currency",
+                "in_list_view": 1,
+                "columns": 1,
+            },
+            {
+                "fieldname": "mmp_mode_of_payment",
+                "label": "Mode of Payment",
+                "fieldtype": "Link",
+                "options": "Mode of Payment",
+                "in_list_view": 1,
+                "columns": 2,
+            },
+            {
+                "fieldname": "mmp_reference_no",
+                "label": "Reference No",
+                "fieldtype": "Data",
+                "in_list_view": 1,
+                "columns": 2,
+            },
+            {
+                "fieldname": "mmp_reference_date",
+                "label": "Reference Date",
+                "fieldtype": "Date",
+                "in_list_view": 1,
+                "columns": 2,
+            },
+            {
+                "fieldname": "mmp_payment_proof",
+                "label": "Payment Proof",
+                "fieldtype": "Attach",
+                "in_list_view": 1,
+                "columns": 3,
+            },
+            {
+                "fieldname": "mmp_payment_entry",
+                "label": "Payment Entry",
+                "fieldtype": "Link",
+                "options": "Payment Entry",
+                "in_list_view": 0,
+                "columns": 1,
+            },
+            {
+                "fieldname": "mmp_posting_date",
+                "label": "Posting Date",
+                "fieldtype": "Date",
+                "in_list_view": 0,
+                "columns": 1,
+            },
+            {
+                "fieldname": "mmp_payment_intent",
+                "label": "Payment Intent",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "hidden": 1,
+            },
+            {
+                "fieldname": "mmp_provider_payment_id",
+                "label": "Provider Payment ID",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "hidden": 1,
+            },
+            {
+                "fieldname": "mmp_gateway",
+                "label": "Gateway",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "hidden": 1,
+            },
+            {
+                "fieldname": "mmp_payment_mode",
+                "label": "Payment Mode",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "hidden": 1,
+            },
+            {
+                "fieldname": "mmp_orchestrator_status",
+                "label": "Orchestrator Status",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "hidden": 1,
+            },
+        ],
+        "permissions": [],  # You can specify permissions here if needed
+    })
+
+    doc.insert(ignore_permissions=True)
+    frappe.db.commit()
+
+
+def _ensure_sr_multi_mode_payment_orchestrator_fields():
+    """Keep Payment Orchestrator trace fields on existing SR Multi Mode Payment tables."""
+    doctype = "SR Multi Mode Payment"
+    doc = frappe.get_doc("DocType", doctype)
+    existing_fields = {field.fieldname for field in doc.fields}
+    fields = [
+        {
+            "fieldname": "mmp_payment_intent",
+            "label": "Payment Intent",
+            "fieldtype": "Data",
+            "read_only": 1,
+            "hidden": 1,
+        },
+        {
+            "fieldname": "mmp_provider_payment_id",
+            "label": "Provider Payment ID",
+            "fieldtype": "Data",
+            "read_only": 1,
+            "hidden": 1,
+        },
+        {
+            "fieldname": "mmp_gateway",
+            "label": "Gateway",
+            "fieldtype": "Data",
+            "read_only": 1,
+            "hidden": 1,
+        },
+        {
+            "fieldname": "mmp_payment_mode",
+            "label": "Payment Mode",
+            "fieldtype": "Data",
+            "read_only": 1,
+            "hidden": 1,
+        },
+        {
+            "fieldname": "mmp_orchestrator_status",
+            "label": "Orchestrator Status",
+            "fieldtype": "Data",
+            "read_only": 1,
+            "hidden": 1,
+        },
+    ]
+
+    changed = False
+    for field in fields:
+        if field["fieldname"] not in existing_fields:
+            doc.append("fields", field)
+            changed = True
+
+    if changed:
+        doc.save(ignore_permissions=True)
+        frappe.clear_cache(doctype=doctype)
 
 
 def create_item_group_template_item_doctype():
