@@ -8,7 +8,7 @@ from . import (
     crm_lead, practitioner, patient_appointment,
     encounter, drug_prescription, item, item_price,
     sales_invoice, payment_entry, purchase_order,
-    # user,
+    user,
     company,
     print_formats,
 )
@@ -124,8 +124,8 @@ def setup_all():
         # -------------------------------------------------
         # User fields/customizations
         # -------------------------------------------------
-        # logger.info("Applying User setup")
-        # user.apply()
+        logger.info("Applying User setup")
+        user.apply()
 
         # -------------------------------------------------
         # Company fields/customizations
@@ -138,6 +138,14 @@ def setup_all():
         # -------------------------------------------------
         logger.info("Applying Print Format setup")
         print_formats.apply()
+
+        # The permissions app is installed first as a dependency. Its defaults
+        # can only be validated after this app has created the referenced CRM
+        # and User fields.
+        logger.info("Applying SRIAAS Role Permissions setup")
+        from sriaas_role_permissions.setup.runner import setup_all as setup_role_permissions
+
+        setup_role_permissions()
 
         # -------------------------------------------------
         # Clear cache & commit
