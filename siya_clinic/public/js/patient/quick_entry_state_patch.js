@@ -42,6 +42,13 @@
     // 🔹 Behavior after dialog render
     const orig_render = QE.prototype.render_dialog;
     QE.prototype.render_dialog = function () {
+      if (this.doc && !this.doc.country) {
+        this.doc.country =
+          frappe.sys_defaults?.country ||
+          frappe.defaults?.get_default?.("country") ||
+          "";
+      }
+
       orig_render.call(this);
 
       const d = this.dialog;
