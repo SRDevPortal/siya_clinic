@@ -38,6 +38,10 @@ has_permission = {
     "CRM Lead": "siya_clinic.api.crm_lead.access.crm_lead_has_permission",
 }
 
+override_doctype_class = {
+    "Patient Encounter": "siya_clinic.api.encounter.patient_encounter.PatientEncounter",
+}
+
 doc_events = {
     "Patient": {
         "autoname": [
