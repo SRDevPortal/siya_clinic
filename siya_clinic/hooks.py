@@ -30,10 +30,6 @@ web_include_css = "/assets/siya_clinic/css/theme_overrides.css"
 #     "Sales Invoice": "public/js/sales_invoice_list.js",
 # }
 
-doctype_list_js = {
-    "CRM Lead": "public/js/crm_lead/list/assignment_actions.js",
-}
-
 permission_query_conditions = {
     "CRM Lead": "siya_clinic.api.crm_lead.access.crm_lead_pqc",
 }
