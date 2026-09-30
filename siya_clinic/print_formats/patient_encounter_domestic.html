@@ -38,7 +38,7 @@
                 {% if comp_addr.city %}{% set _ = address_parts.append(comp_addr.city) %}{% endif %}
                 {% if comp_addr.state %}{% set _ = address_parts.append(comp_addr.state) %}{% endif %}
                 {% if comp_addr.pincode %}{% set _ = address_parts.append("PIN: " ~ comp_addr.pincode) %}{% endif %}
-                {% if comp_addr.country %}{% set _ = address_parts.append(comp_addr.country) %}{% endif %}            
+                {% if comp_addr.country %}{% set _ = address_parts.append(comp_addr.country) %}{% endif %}
 
                 {{ address_parts | join(", ") }}<br>
               {% endif %}
