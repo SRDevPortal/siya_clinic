@@ -69,3 +69,31 @@ Pre-commit is configured to use the following tools for checking and formatting 
 ## License
 
 MIT
+
+## Encounter print formats per site
+
+Open **Clinic Settings** from Desk search (System Manager) and select **Domestic**
+or **International**. Saving immediately selects the matching Patient Encounter
+print format. Settings are stored separately on each site and are not fixtures.
+
+- `Patient Encounter Domestic`: the previous app encounter layout, unchanged.
+- `Patient Encounter International`: the approved A4 layout, with 12 mm side
+  margins and 10 mm top/bottom margins.
+- `Patient Encounter New`: a compatibility copy of the selected layout, so old
+  print links and integrations continue to use the correct regional template.
+
+Deploy this app version and run `bench --site <site> migrate` on each site.
+Migration preserves an existing Clinic Settings choice. On the first upgrade,
+existing named defaults are respected; the exact approved international template
+in Patient Encounter New is recognized before templates are updated. Otherwise,
+the initial selection is Domestic. Verify International in Clinic Settings on
+international sites after deployment, especially if their template was edited.
+
+The templates are app-managed: edit their files under `siya_clinic/print_formats`
+for durable layout changes. Migrations refresh them from source. Do not export
+Clinic Settings or the encounter default Property Setter into shared fixtures.
+Python integrations can resolve the site's selection with
+`siya_clinic.setup.print_formats.get_encounter_print_format()`.
+
+Validation: `./env/bin/python -m unittest siya_clinic.tests.test_print_regions`
+from the bench directory.

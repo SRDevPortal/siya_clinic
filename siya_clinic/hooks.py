@@ -269,11 +269,20 @@ override_whitelisted_methods = {
 
 fixtures = [
     {"dt": "Custom Field", "filters": [["module", "=", "Siya Clinic"]]},
-    {"dt": "Property Setter", "filters": [["module", "=", "Siya Clinic"]]},
+    {
+        "dt": "Property Setter",
+        "filters": [["module", "=", "Siya Clinic"], ["name", "not in", ["Patient Encounter-default_print_format", "Patient Encounter-main-default_print_format"]]],
+    },
     {"dt": "Client Script", "filters": [["module", "=", "Siya Clinic"]]},
     {"dt": "Server Script", "filters": [["module", "=", "Siya Clinic"]]},
     {"dt": "Workspace", "filters": [["module", "=", "Siya Clinic"]]},
-    {"dt": "Print Format", "filters": [["module", "=", "Siya Clinic"]]},
+    {
+        "dt": "Print Format",
+        "filters": [["module", "=", "Siya Clinic"], ["name", "not in", [
+            "Patient Encounter New", "Patient Encounter Domestic",
+            "Patient Encounter International", "Purchase Order New",
+        ]]],
+    },
     {"dt": "Report", "filters": [["module", "=", "Siya Clinic"]]},
     {"dt": "Dashboard Chart", "filters": [["module", "=", "Siya Clinic"]]},
     {"dt": "Notification", "filters": [["module", "=", "Siya Clinic"]]},

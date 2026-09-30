@@ -1,0 +1,31 @@
+{
+  "doctype": "DocType",
+  "name": "Clinic Settings",
+  "module": "Siya Clinic",
+  "issingle": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "encounter_print_region"
+  ],
+  "fields": [
+    {
+      "fieldname": "encounter_print_region",
+      "fieldtype": "Select",
+      "label": "Encounter Print Region",
+      "options": "Domestic\nInternational",
+      "reqd": 1,
+      "description": "Choose the encounter layout for this site. Saving updates its default print format and existing Patient Encounter New links."
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1
+    }
+  ],
+  "track_changes": 1,
+  "sort_field": "modified",
+  "sort_order": "DESC"
+}
