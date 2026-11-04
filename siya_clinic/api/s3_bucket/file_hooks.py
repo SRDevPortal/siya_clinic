@@ -152,6 +152,8 @@ def handle_file_after_insert(doc, method=None):
 		doc.db_set("file_url", s3_url, update_modified=False)
 
 		if _is_payment_proof_file(doc):
+			from .pending_proofs import remember_upload
+			remember_upload(doc, key, get_bucket())
 			if local_path and os.path.exists(local_path):
 				os.remove(local_path)
 			_delete_file_doc_only(doc.name)

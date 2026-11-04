@@ -38,14 +38,6 @@ def delete_file_from_s3(file_url: str):
 		logger.error(f"S3_DELETE_FAILED | url={file_url}\n{frappe.get_traceback()}")
 
 
-@frappe.whitelist()
-def delete_s3_by_url(file_url: str):
-	if not file_url:
-		return {"status": "no_file_url"}
-
-	delete_file_from_s3(file_url)
-
-	return {
-		"status": "deleted",
-		"file_url": file_url,
-	}
+def delete_s3_by_url(file_url=None, **kwargs):
+    """Retired URL-only RPC. Parent-save hooks own attachment removal."""
+    raise frappe.PermissionError("Remove this attachment from its parent record and save.")

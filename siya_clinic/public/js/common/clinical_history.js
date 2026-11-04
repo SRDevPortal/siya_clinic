@@ -1,4 +1,4 @@
-// siya_clinic/public/js/common/clinical_history.js
+// siya_clinic/public/js/clinical_history_modal.js
 
 // =====================================================
 // 1️⃣ Helper Utilities
@@ -100,9 +100,9 @@ function _build_header(patient) {
     <div class="meta"><b>Patient ID:</b> ${_esc(patient.sr_patient_id || patient.patient_id || patient.name)}</div>
     <div class="meta"><b>Gender:</b> ${_esc(patient.sex || patient.gender || "-")}</div>
     <div class="meta">
-      <b>Mobile:</b> ${_esc(patient.mobile || patient.mobile_no || patient.sr_mobile_no || "-")}
+      <b>Mobile:</b> ${_esc(patient.mobile || patient.mask_mobile || "-")}
       &nbsp;&nbsp;
-      <b>Phone:</b> ${_esc(patient.phone || patient.phone_no || patient.sr_phone_no || "-")}
+      <b>Phone:</b> ${_esc(patient.phone || patient.mask_phone || "-")}
     </div>
   </div>`;
 }
@@ -151,19 +151,14 @@ function _build_blocks(rows) {
       if (!cleaned) return "";
       return `
         <div class="section-title">${title}</div>
-        <div class="row-line">${_esc(cleaned).replace(/\n/g, "<br>")}</div>`;
+        <div class="row-line">${_esc(cleaned)}</div>`;
     };
 
     return `
       <div class="enc-card">
         <div class="enc-head">
-            <b>Encounter:</b> ${_esc(e.name)}
-            &nbsp;&nbsp; | &nbsp;&nbsp;
-            <b>Date:</b> ${_esc(date_txt)}
-            &nbsp;&nbsp; | &nbsp;&nbsp;
-            <b>Type:</b> ${_esc(e.sr_encounter_type || "-")}
-            &nbsp;&nbsp; | &nbsp;&nbsp;
-            <b>Place:</b> ${_esc(e.sr_encounter_place || "-")}
+          <b>Encounter:</b> ${_esc(e.name)} &nbsp;&nbsp;
+          <b>Date:</b> ${_esc(date_txt)}
         </div>
 
         ${section("Complaints", e.sr_complaints)}
@@ -192,26 +187,10 @@ async function _fetch_patient(patient_name) {
 
 async function _fetch_encounters(patient_name) {
   const { message: rows = [] } = await frappe.call({
-    method: "frappe.client.get_list",
-    args: {
-      doctype: "Patient Encounter",
-      filters: { patient: patient_name },
-      fields: ["name", "encounter_date"],
-      order_by: "encounter_date desc, creation desc",
-      limit_page_length: 100
-    }
+    method: "siya_clinic.api.clinical_history.get_encounters",
+    args: { patient: patient_name }
   });
-
-  const full = await Promise.all(
-    rows.map(r =>
-      frappe.call({
-        method: "frappe.client.get",
-        args: { doctype: "Patient Encounter", name: r.name }
-      }).then(res => res.message)
-    )
-  );
-
-  return full.filter(_has_notes);
+  return rows.filter(_has_notes);
 }
 
 // =====================================================

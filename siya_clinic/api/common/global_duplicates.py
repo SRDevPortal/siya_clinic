@@ -1,4 +1,14 @@
 import frappe
+
+
+def _duplicate_reference(message):
+    from privacy_shield.desk import enabled
+    from privacy_shield.policy import current_capabilities
+    if enabled("Patient") and not current_capabilities().view_full:
+        from privacy_shield.display_text import mask_display
+        return mask_display(message)
+    return message
+
 import re
 
 # ---------------------------------------------------------
@@ -103,7 +113,7 @@ def validate_global_mobile(mobile, current_doctype, current_name):
         if current_doctype == "Contact":
             return
 
-        frappe.throw(f"Mobile already linked with Contact: {contact_name}")
+        frappe.throw(_duplicate_reference(f"Mobile already linked with Contact: {contact_name}"))
 
     # ---------------- PATIENT ----------------
     patient = frappe.db.get_value(
@@ -117,7 +127,7 @@ def validate_global_mobile(mobile, current_doctype, current_name):
             return
 
         if current_doctype != "Patient":
-            frappe.throw(f"Mobile already linked with Patient: {patient}")
+            frappe.throw(_duplicate_reference(f"Mobile already linked with Patient: {patient}"))
 
     # ---------------- CUSTOMER ----------------
     customer = frappe.db.get_value(
@@ -131,7 +141,7 @@ def validate_global_mobile(mobile, current_doctype, current_name):
             return
 
         if current_doctype != "Customer":
-            frappe.throw(f"Mobile already linked with Customer: {customer}")
+            frappe.throw(_duplicate_reference(f"Mobile already linked with Customer: {customer}"))
 
 
 # ---------------------------------------------------------
@@ -183,7 +193,7 @@ def validate_global_email(email, current_doctype, current_name):
         if current_doctype == "Contact":
             return
 
-        frappe.throw(f"Email already linked with Contact: {contact}")
+        frappe.throw(_duplicate_reference(f"Email already linked with Contact: {contact}"))
 
     # ---------------- PATIENT ----------------
     patient = frappe.db.get_value(
@@ -197,7 +207,7 @@ def validate_global_email(email, current_doctype, current_name):
             return
 
         if current_doctype != "Patient":
-            frappe.throw(f"Email already linked with Patient: {patient}")
+            frappe.throw(_duplicate_reference(f"Email already linked with Patient: {patient}"))
 
     # ---------------- CUSTOMER ----------------
     customer = frappe.db.get_value(
@@ -211,4 +221,4 @@ def validate_global_email(email, current_doctype, current_name):
             return
 
         if current_doctype != "Customer":
-            frappe.throw(f"Email already linked with Customer: {customer}")
+            frappe.throw(_duplicate_reference(f"Email already linked with Customer: {customer}"))

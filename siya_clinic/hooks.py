@@ -4,7 +4,7 @@ app_publisher = "SIYA"
 app_description = "Clinic customizations packaged as clean installable/uninstallable app."
 app_email = "webdevelopersriaas@gmail.com"
 app_license = "mit"
-required_apps = ["sriaas_role_permissions"]
+required_apps = ["sriaas_role_permissions", "privacy_shield"]
 
 # Installation
 before_install = "siya_clinic.install.before_install"
@@ -291,3 +291,51 @@ fixtures = [
     {"dt": "Form Tour Step", "filters": [["module", "=", "Siya Clinic"]]},
     {"dt": "Custom DocPerm", "filters": [["module", "=", "Siya Clinic"]]},
 ]
+
+# Exactly one clinic adapter is registered on each site.
+privacy_shield_clinic_adapter = "siya_clinic.privacy_adapter"
+
+# Privacy adapters project responses; original business hooks and field names stay intact.
+app_include_js += [
+    "/assets/privacy_shield/js/desk_privacy.js?v=clinic-adapter-20261104",
+    "/assets/siya_clinic/js/common/contact_numbers.js?v=20261104",
+    "/assets/siya_clinic/js/patient/privacy_intake.js?v=20261104",
+]
+doctype_js["CRM Lead"].append("public/js/crm_lead/form/number_privacy.js")
+doc_events["Patient"]["before_insert"].insert(0, "privacy_shield.patient_intake.capture_contact_additions")
+doc_events["Patient"]["on_update"].append("privacy_shield.patient_intake.apply_contact_additions")
+override_doctype_class["CRM Notification"] = "siya_clinic.api.crm_lead.privacy_notifications.PrivacyCRMNotification"
+
+override_whitelisted_methods.update({
+    "frappe.core.doctype.data_export.exporter.export_data": "siya_clinic.api.crm_lead.privacy_outputs.export_data",
+    "frappe.desk.reportview.export_query": "siya_clinic.api.crm_lead.privacy_outputs.export_query",
+    "frappe.utils.print_format.download_pdf": "siya_clinic.api.crm_lead.privacy_outputs.download_pdf",
+    "frappe.www.printview.get_html_and_style": "siya_clinic.api.crm_lead.privacy_outputs.get_html_and_style",
+    "frappe.client.insert": "siya_clinic.api.crm_lead.privacy.lifecycle_insert",
+    "frappe.client.insert_many": "siya_clinic.api.crm_lead.privacy.lifecycle_insert_many",
+    "frappe.client.submit": "siya_clinic.api.crm_lead.privacy.lifecycle_submit",
+    "frappe.client.cancel": "siya_clinic.api.crm_lead.privacy.lifecycle_cancel",
+    "frappe.client.bulk_update": "siya_clinic.api.crm_lead.privacy.lifecycle_bulk_update",
+    "frappe.desk.form.save.cancel": "siya_clinic.api.crm_lead.privacy.lifecycle_desk_cancel",
+
+    "crm.api.doc.get_data": "siya_clinic.api.crm_lead.privacy_views.get_data",
+    "frappe.desk.reportview.get": "siya_clinic.api.crm_lead.privacy.reportview_get",
+    "frappe.desk.reportview.get_list": "siya_clinic.api.crm_lead.privacy.reportview_get_list",
+    "frappe.desk.search.search_link": "siya_clinic.api.crm_lead.privacy.search_link",
+    "frappe.desk.search.search_widget": "siya_clinic.api.crm_lead.privacy.search_widget",
+    "frappe.client.get_list": "siya_clinic.api.crm_lead.privacy.client_get_list",
+    "frappe.client.get_value": "siya_clinic.api.crm_lead.privacy.client_get_value",
+    "frappe.desk.form.load.getdoc": "siya_clinic.api.crm_lead.privacy.desk_getdoc",
+    "frappe.desk.form.save.savedocs": "siya_clinic.api.crm_lead.privacy.desk_savedocs",
+    "frappe.client.get": "siya_clinic.api.crm_lead.privacy.client_get",
+    "frappe.client.save": "siya_clinic.api.crm_lead.privacy.client_save",
+    "frappe.client.set_value": "siya_clinic.api.crm_lead.privacy.client_set_value",
+})
+
+
+# Project Lead detail metadata to the same masked keys as its document response.
+override_whitelisted_methods.update({
+    "crm.fcrm.doctype.crm_fields_layout.crm_fields_layout.get_sidepanel_sections":
+        "siya_clinic.api.crm_lead.privacy_views.get_sidepanel_sections",
+})
+override_whitelisted_methods["crm_lead_dedupe.api.crm_lead_duplicates.get_duplicates_for_crm_lead"] = "siya_clinic.api.crm_lead.privacy_duplicates.get_duplicates_for_crm_lead"

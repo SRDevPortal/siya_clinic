@@ -9,27 +9,17 @@ frappe.ui.form.on("Patient", {
 		// Do not run for new patient
 		if (frm.is_new()) return;
 
-		// Clear table before loading
+		const patient = frm.doc.name;
+		const request = (frm.__siya_invoice_request || 0) + 1;
+		frm.__siya_invoice_request = request;
 		frm.clear_table("sr_sales_invoice_list");
 
 		frappe.call({
-			method: "frappe.client.get_list",
-			args: {
-				doctype: "Sales Invoice",
-				filters: {
-					patient: frm.doc.name,   // Healthcare link
-					docstatus: 1             // Submitted only
-				},
-				fields: [
-					"name",
-					"posting_date",
-					"grand_total",
-					"outstanding_amount"
-				],
-				order_by: "posting_date desc",
-				limit_page_length: 100
-			},
+			method: "siya_clinic.api.patient_invoices.get_patient_invoices",
+			args: { patient, limit_page_length: 100 },
 			callback(r) {
+				if (frm.doc.name !== patient || frm.__siya_invoice_request !== request) return;
+				frm.clear_table("sr_sales_invoice_list");
 				(r.message || []).forEach((inv) => {
 					let row = frm.add_child("sr_sales_invoice_list");
 

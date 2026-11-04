@@ -3,7 +3,7 @@
 console.log("Patient Encounter JS file loaded");
 
 frappe.ui.form.on('Patient Encounter', {
-    
+
     // -----------------------------
     // Form Load
     // -----------------------------
@@ -202,7 +202,7 @@ function intercept_s3_attachments(frm) {
 
                     frappe.call({
                         method: 'siya_clinic.api.s3_bucket.presign.get_presigned_url',
-                        args: { file_url: href },
+                        args: { file_url: href, doctype: frm.doctype, docname: frm.doc.name },
                         callback(r) {
                             if (typeof r.message === 'string') {
                                 window.open(r.message, '_blank');
@@ -218,21 +218,6 @@ function intercept_s3_attachments(frm) {
 }
 
 
-// ==========================================================
-// Child Table: SR Multi Mode Payment
-// ==========================================================
-frappe.ui.form.on('SR Multi Mode Payment', {
-    mmp_payment_proof(frm, cdt, cdn) {
-        const row = frappe.get_doc(cdt, cdn);
-
-        if (!row.mmp_payment_proof && row.__last_proof) {
-            frappe.call({
-                method: 'siya_clinic.api.s3_bucket.delete.delete_s3_by_url',
-                args: { file_url: row.__last_proof },
-                silent: true
-            });
-        }
-
-        row.__last_proof = row.mmp_payment_proof;
-    }
-});
+// Payment-proof removal is committed through the normal Encounter save.
+// cleanup_payment_proof_removals handles authorized deletion after comparing
+// the saved parent with its previous version. Never delete by browser URL.
