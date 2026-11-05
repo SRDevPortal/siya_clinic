@@ -102,4 +102,28 @@ class PendingPaymentProofTests(unittest.TestCase):
             meta.get_permlevel_access.return_value = [0]
             self.assertFalse(real_helper())
 
+    def test_temporary_parent_requires_create_and_write(self):
+        with patch.object(frappe, "new_doc", return_value=self.doc):
+            result = proofs.get_parent("new-patient-encounter-abc123")
+            self.assertEqual(result.name, "new-patient-encounter-abc123")
+            self.doc.check_permission.assert_any_call("create")
+            self.doc.check_permission.assert_any_call("write")
+            self.doc.check_permission.side_effect = frappe.PermissionError
+            with self.assertRaises(frappe.PermissionError):
+                proofs.get_parent("new-patient-encounter-abc123")
+
+    def test_unsaved_upload_receipt_supports_only_its_uploader_and_target(self):
+        self.file.attached_to_name = "new-patient-encounter-abc123"
+        with patch.object(frappe, "new_doc", return_value=self.doc):
+            self.remember()
+            self.assertTrue(proofs.allows_preview(self.doc, "synthetic/proof.pdf", "test-bucket"))
+            self.session.user = "other-user"
+            self.assertFalse(proofs.allows_preview(self.doc, "synthetic/proof.pdf", "test-bucket"))
+
+    def test_missing_saved_parent_is_not_treated_as_new(self):
+        with patch.object(frappe, "get_doc", side_effect=frappe.DoesNotExistError), patch.object(frappe, "new_doc") as new:
+            with self.assertRaises(frappe.DoesNotExistError):
+                proofs.get_parent("PE-MISSING")
+            new.assert_not_called()
+
     _fields_helper = staticmethod(proofs._fields_allowed)

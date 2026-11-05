@@ -63,7 +63,8 @@ def authorize_source(file_url, key, bucket, region, doctype=None, docname=None):
             # Payment Proof is an explicitly readable workflow field. Do not
             # grant access to the parent's other attachments through this exception.
             if doctype == "Patient Encounter" and docname:
-                doc = frappe.get_doc(doctype, docname)
+                from .pending_proofs import get_parent
+                doc = get_parent(docname)
                 doc.check_permission("read")
                 doc.apply_fieldlevel_read_permissions()
                 from .pending_proofs import allows_preview
@@ -78,7 +79,8 @@ def authorize_source(file_url, key, bucket, region, doctype=None, docname=None):
         meta = frappe.get_meta(doctype)
         if meta.istable:
             raise frappe.PermissionError("Use the parent record for attachment access.")
-        doc = frappe.get_doc(doctype, docname)
+        from .pending_proofs import get_parent
+        doc = get_parent(docname) if doctype == "Patient Encounter" else frappe.get_doc(doctype, docname)
         doc.check_permission("read")
         doc.apply_fieldlevel_read_permissions()
         if references_attachment(doc, aliases):

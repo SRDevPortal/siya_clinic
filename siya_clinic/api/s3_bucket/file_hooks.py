@@ -16,6 +16,7 @@ _original_validate_file_url = File.validate_file_url
 _original_file_validate = File.validate
 _original_get_full_path = File.get_full_path
 _original_get_content = File.get_content
+_original_delete_file_on_disk = File._delete_file_on_disk
 
 if "s3://" not in file_module.URL_PREFIXES:
 	file_module.URL_PREFIXES = (*file_module.URL_PREFIXES, "s3://")
@@ -65,11 +66,31 @@ def s3_safe_get_content(self):
 	return _original_get_content(self)
 
 
+def s3_safe_delete_file_on_disk(self):
+    if self.file_url and str(self.file_url).startswith("s3://"):
+        # Remote object removal belongs to handle_file_on_trash. In particular,
+        # deleting the payment-proof File row must preserve the uploaded object.
+        if self.thumbnail_url:
+            file_module.delete_file(self.thumbnail_url)
+        return
+    return _original_delete_file_on_disk(self)
+
+
 File.exists_on_disk = s3_safe_exists_on_disk
 File.validate_file_url = s3_safe_validate_file_url
 File.validate = s3_safe_file_validate
 File.get_full_path = s3_safe_get_full_path
 File.get_content = s3_safe_get_content
+File._delete_file_on_disk = s3_safe_delete_file_on_disk
+
+
+def initialize_file_support():
+    """Import this module before upload duplicate checks or other File reads.
+
+    The File event hooks import too late: File.before_insert already checks
+    existing content hashes before after_insert loads storage integration.
+    """
+    return None
 
 
 logger = frappe.logger("siya_s3")

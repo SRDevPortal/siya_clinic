@@ -339,3 +339,6 @@ override_whitelisted_methods.update({
         "siya_clinic.api.crm_lead.privacy_views.get_sidepanel_sections",
 })
 override_whitelisted_methods["crm_lead_dedupe.api.crm_lead_duplicates.get_duplicates_for_crm_lead"] = "siya_clinic.api.crm_lead.privacy_duplicates.get_duplicates_for_crm_lead"
+
+# Load S3 File support before native upload duplicate detection.
+before_request = ["siya_clinic.api.s3_bucket.file_hooks.initialize_file_support"]
