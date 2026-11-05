@@ -8,7 +8,9 @@ frappe.ui.form.on("Patient", {
 	refresh(frm) {
 		if (frm.is_new()) return;
 
-		frm.clear_table("sr_payment_entry_list");
+		const patient = frm.doc.name;
+		const request = (frm.__siya_payment_request || 0) + 1;
+		frm.__siya_payment_request = request;
 
 		let filters = {
 			docstatus: 1
@@ -40,8 +42,13 @@ frappe.ui.form.on("Patient", {
 				limit_page_length: 100
 			},
 			callback(r) {
+				if (frm.doc.name !== patient || frm.__siya_payment_request !== request) return;
+				frm.clear_table("sr_payment_entry_list");
 				(r.message || []).forEach((pay) => {
-					let row = frm.add_child("sr_payment_entry_list");
+					// Summary rows must not mark the Patient as edited.
+					let row = frappe.model.get_new_doc(
+						frm.fields_dict.sr_payment_entry_list.df.options, frm.doc, "sr_payment_entry_list"
+					);
 
 					row.sr_payment_entry = pay.name;
 					row.sr_posting_date = pay.posting_date;

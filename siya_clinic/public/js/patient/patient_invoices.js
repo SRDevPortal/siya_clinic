@@ -21,7 +21,10 @@ frappe.ui.form.on("Patient", {
 				if (frm.doc.name !== patient || frm.__siya_invoice_request !== request) return;
 				frm.clear_table("sr_sales_invoice_list");
 				(r.message || []).forEach((inv) => {
-					let row = frm.add_child("sr_sales_invoice_list");
+					// Summary rows must not mark the Patient as edited.
+					let row = frappe.model.get_new_doc(
+						frm.fields_dict.sr_sales_invoice_list.df.options, frm.doc, "sr_sales_invoice_list"
+					);
 
 					row.sr_invoice_no   = inv.name;
 					row.sr_posting_date = inv.posting_date;

@@ -5,11 +5,11 @@ const vm = require('node:vm');
 let refresh;
 const requests = [];
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/js/patient/patient_invoices.js'), 'utf8'), {
-    frappe: {ui: {form: {on(dt, events) {refresh = events.refresh;}}}, call(options) {requests.push(options);}}
+    frappe: {model: {get_new_doc(dt, doc, field) {const row = {}; rows.push(row); return row;}}, ui: {form: {on(dt, events) {refresh = events.refresh;}}}, call(options) {requests.push(options);}}
 });
 const rows = [];
-const frm = {doc: {name: 'PAT-A'}, is_new: () => false,
-    clear_table() {rows.length = 0;}, add_child() {const row = {}; rows.push(row); return row;}, refresh_field() {}};
+const frm = {fields_dict: {sr_sales_invoice_list: {df: {options: 'SR Patient Invoice View'}}}, doc: {name: 'PAT-A'}, is_new: () => false,
+    clear_table() {rows.length = 0;}, add_child() {throw new Error('Summary must not use dirtying add_child');}, refresh_field() {}};
 refresh({...frm, is_new: () => true});
 assert.equal(requests.length, 0);
 refresh(frm);
