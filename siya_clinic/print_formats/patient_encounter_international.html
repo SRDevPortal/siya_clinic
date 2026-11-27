@@ -28,19 +28,11 @@
           <tr>
             <td style="font-size: 12px; line-height: 1.5; vertical-align: top; width: 50%; padding-left: 0 !important;">
               {% if comp_addr %}
-                {{ comp_addr.address_line1 }}<br>
-
-                {% if comp_addr.address_line2 %}
-                  {{ comp_addr.address_line2 }}<br>
-                {% endif %}
-
-                {% set address_parts = [] %}
-                {% if comp_addr.city %}{% set _ = address_parts.append(comp_addr.city) %}{% endif %}
-                {% if comp_addr.state %}{% set _ = address_parts.append(comp_addr.state) %}{% endif %}
-                {% if comp_addr.pincode %}{% set _ = address_parts.append(comp_addr.pincode) %}{% endif %}
-                {% if comp_addr.country %}{% set _ = address_parts.append(comp_addr.country) %}{% endif %}
-
-                {{ address_parts | join(", ") }}<br>
+                {% set company_street = [comp_addr.address_line1, comp_addr.address_line2] | select | join(", ") %}
+                {% set company_state_pin = [comp_addr.state, comp_addr.pincode] | select | join(" ") %}
+                {% set company_locality = [comp_addr.city, company_state_pin] | select | join(", ") %}
+                {% set company_address_lines = [(company_street ~ ",") if company_street else "", (company_locality ~ ("," if comp_addr.country else "")) if company_locality else "", comp_addr.country] | select | list %}
+                {% for line in company_address_lines %}{{ line | e }}<br>{% endfor %}
               {% endif %}
 
               {% if company_doc.sr_company_cin_no %}
@@ -174,7 +166,27 @@
   {% endif %}
 {% endif %}
 
-{% set email = patient.email if patient and patient.email else "" %}
+{# Contact.email_id is maintained by Frappe from the email row marked primary. #}
+{% set patient_contact_links = frappe.get_all(
+  "Dynamic Link",
+  filters={
+    "parenttype": "Contact",
+    "parentfield": "links",
+    "link_doctype": "Patient",
+    "link_name": doc.patient
+  },
+  pluck="parent"
+) if doc.patient else [] %}
+{% set primary_email_contacts = frappe.get_all(
+  "Contact",
+  filters={"name": ["in", patient_contact_links], "email_id": ["!=", ""]},
+  fields=["email_id"],
+  order_by="is_primary_contact desc, creation asc, name asc",
+  limit=1
+) if patient_contact_links else [] %}
+{% set patient_email = (patient.email or "") | trim if patient else "" %}
+{% set single_patient_email = patient_email if "," not in patient_email and ";" not in patient_email and "\n" not in patient_email and "\r" not in patient_email else "" %}
+{% set email = primary_email_contacts[0].email_id if primary_email_contacts else single_patient_email %}
 
 <div class="hdr-wrap patient-details">
   <table class="card">
@@ -212,10 +224,11 @@
             <tr>
               <td class="lbl">Address:</td>
               <td class="val addr">
-                {{ addr.address_line1 or "" }}
-                {% if addr.address_line2 %}<br>{{ addr.address_line2 }}{% endif %}
-                {% if addr.city %}<br>{{ addr.city }}{% endif %}, {% if addr.state %} {{ addr.state }}{% endif %}
-                {% if addr.pincode %}<br>{{ addr.pincode }}{% endif %}, {% if addr.country %} {{ addr.country }}{% endif %}
+                {% set street = [addr.address_line1, addr.address_line2] | select | join(", ") %}
+                {% set state_pin = [addr.state, addr.pincode] | select | join(" ") %}
+                {% set locality = [addr.city, state_pin] | select | join(", ") %}
+                {% set address_lines = [(street ~ ",") if street else "", (locality ~ ("," if addr.country else "")) if locality else "", addr.country] | select | list %}
+                {% for line in address_lines %}{{ line | e }}{% if not loop.last %}<br>{% endif %}{% endfor %}
               </td>
             </tr>
             {% endif %}
